@@ -13,13 +13,13 @@ class SyncService {
   Future<bool> syncToServer() async {
     try {
       Logger.info('Starting data sync to server');
-      
+
       // TODO: Implement sync logic for:
       // - Professors
-      // - Students  
+      // - Students
       // - Groups
       // - Attendance records
-      
+
       Logger.info('Data sync completed successfully');
       return true;
     } catch (e, stackTrace) {
@@ -32,9 +32,9 @@ class SyncService {
   Future<bool> syncFromServer() async {
     try {
       Logger.info('Starting data sync from server');
-      
+
       // TODO: Implement sync logic to pull data from server
-      
+
       Logger.info('Data sync from server completed successfully');
       return true;
     } catch (e, stackTrace) {

@@ -16,13 +16,13 @@ class DatabaseService {
   Future<void> init() async {
     try {
       await Hive.initFlutter();
-      
+
       // Open all boxes
       await Hive.openBox(_professorsBox);
       await Hive.openBox(_studentsBox);
       await Hive.openBox(_groupsBox);
       await Hive.openBox(_attendanceBox);
-      
+
       Logger.info('Database initialized successfully');
     } catch (e, stackTrace) {
       Logger.error('Error initializing database', e, stackTrace);

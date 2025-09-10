@@ -15,7 +15,7 @@ class BluetoothService {
         Logger.error('Bluetooth not supported on this device');
         return false;
       }
-      
+
       final adapterState = await FlutterBluePlus.adapterState.first;
       return adapterState == BluetoothAdapterState.on;
     } catch (e, stackTrace) {

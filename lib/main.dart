@@ -6,7 +6,7 @@ import 'core/utils/utils.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   try {
     // Initialize database
     await DatabaseService().init();
@@ -14,12 +14,8 @@ void main() async {
   } catch (e, stackTrace) {
     Logger.error('Error during app initialization', e, stackTrace);
   }
-  
-  runApp(
-    const ProviderScope(
-      child: MyApp(),
-    ),
-  );
+
+  runApp(const ProviderScope(child: MyApp()));
 }
 
 class MyApp extends ConsumerWidget {
@@ -30,9 +26,7 @@ class MyApp extends ConsumerWidget {
     return MaterialApp(
       title: AppConstants.appName,
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.deepPurple,
-        ),
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
       ),
       home: const MyHomePage(),

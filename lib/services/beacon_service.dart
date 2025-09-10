@@ -30,8 +30,9 @@ class BeaconService {
   Future<void> startMonitoring() async {
     try {
       Logger.info('Starting beacon monitoring');
-      
-      final isBluetoothAvailable = await _bluetoothService.isBluetoothAvailable();
+
+      final isBluetoothAvailable = await _bluetoothService
+          .isBluetoothAvailable();
       if (!isBluetoothAvailable) {
         Logger.error('Bluetooth not available for beacon monitoring');
         return;
