@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'services/database_service.dart';
 import 'core/constants/app_constants.dart';
 import 'core/utils/utils.dart';
+import 'features/authentication/presentation/pages/login_page.dart';
+import 'features/authentication/presentation/pages/dashboard_page.dart';
+import 'features/authentication/providers/auth_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -18,57 +22,57 @@ void main() async {
   runApp(const ProviderScope(child: MyApp()));
 }
 
+final routerProvider = Provider<GoRouter>((ref) {
+  final authState = ref.watch(authStateProvider);
+
+  return GoRouter(
+    initialLocation: authState.isAuthenticated ? '/dashboard' : '/login',
+    redirect: (context, state) {
+      final isAuthenticated = authState.isAuthenticated;
+      final isLoggingIn = state.matchedLocation == '/login';
+
+      // If not authenticated and not on login page, go to login
+      if (!isAuthenticated && !isLoggingIn) {
+        return '/login';
+      }
+
+      // If authenticated and on login page, go to dashboard
+      if (isAuthenticated && isLoggingIn) {
+        return '/dashboard';
+      }
+
+      // No redirect needed
+      return null;
+    },
+    routes: [
+      GoRoute(path: '/login', builder: (context, state) => const LoginPage()),
+      GoRoute(
+        path: '/dashboard',
+        builder: (context, state) => const DashboardPage(),
+      ),
+      GoRoute(
+        path: '/',
+        redirect: (context, state) =>
+            authState.isAuthenticated ? '/dashboard' : '/login',
+      ),
+    ],
+  );
+});
+
 class MyApp extends ConsumerWidget {
   const MyApp({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return MaterialApp(
+    final router = ref.watch(routerProvider);
+
+    return MaterialApp.router(
       title: AppConstants.appName,
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
         useMaterial3: true,
       ),
-      home: const MyHomePage(),
-    );
-  }
-}
-
-class MyHomePage extends ConsumerStatefulWidget {
-  const MyHomePage({super.key});
-
-  @override
-  ConsumerState<MyHomePage> createState() => _MyHomePageState();
-}
-
-class _MyHomePageState extends ConsumerState<MyHomePage> {
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        title: const Text(AppConstants.appName),
-      ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            const Text('Bienvenido a la App de Profesores Universidad'),
-            const SizedBox(height: 20),
-            const Text('Funcionalidades disponibles:'),
-            const SizedBox(height: 10),
-            const Text('• Gestión de grupos y estudiantes'),
-            const Text('• Control de asistencia'),
-            const Text('• Detección automática por beacon'),
-            const Text('• Generación de reportes'),
-            const SizedBox(height: 30),
-            Text(
-              'Versión: ${AppConstants.appVersion}',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-          ],
-        ),
-      ),
+      routerConfig: router,
     );
   }
 }
