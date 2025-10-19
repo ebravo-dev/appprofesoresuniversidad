@@ -7,11 +7,11 @@ import '../../../core/utils/utils.dart';
 class AuthServiceMock implements AuthService {
   // Datos mock de profesores UAT
   static final Map<String, Map<String, dynamic>> _mockProfessors = {
-    'juan.perez@uat.edu.mx': {
+    'juan.perez@docentes.uat.edu.mx': {
       'password': 'uat2024',
       'user': User(
         id: 'prof_001',
-        email: 'juan.perez@uat.edu.mx',
+        email: 'juan.perez@docentes.uat.edu.mx',
         name: 'Dr. Juan Carlos Pérez García',
         role: 'professor',
         employeeId: 'EMP001',
@@ -286,7 +286,7 @@ class AuthServiceMock implements AuthService {
   /// Obtener credenciales de prueba para desarrollo
   static Map<String, String> getTestCredentials() {
     return {
-      'Profesor ISC': 'juan.perez@uat.edu.mx / uat2024',
+      'Profesor ISC': 'juan.perez@docentes.uat.edu.mx / uat2024',
       'Profesora MAT': 'maria.rodriguez@uat.edu.mx / uat2024',
     };
   }

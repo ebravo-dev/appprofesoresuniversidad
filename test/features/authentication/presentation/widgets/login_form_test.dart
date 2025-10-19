@@ -43,7 +43,8 @@ void main() {
 
       // Check if username field exists
       expect(find.byKey(const Key('username_field')), findsOneWidget);
-      expect(find.text('Usuario UAT'), findsOneWidget);
+      // Find elements
+      expect(find.text('Usuario institucional'), findsOneWidget);
 
       // Check if password field exists
       expect(find.byKey(const Key('password_field')), findsOneWidget);
@@ -55,10 +56,7 @@ void main() {
 
       // Check if demo credentials hint exists
       expect(find.text('Credenciales de prueba:'), findsOneWidget);
-      expect(
-        find.text('Usuario: juan.perez@uat.edu.mx / Contraseña: uat2024'),
-        findsOneWidget,
-      );
+      expect(find.text('• juan.perez + @docentes.uat.edu.mx'), findsOneWidget);
     });
 
     testWidgets('shows validation errors for empty fields', (tester) async {
@@ -123,7 +121,7 @@ void main() {
       // Enter valid credentials
       await tester.enterText(
         find.byKey(const Key('username_field')),
-        'juan.perez@uat.edu.mx',
+        'juan.perez',
       );
       await tester.enterText(
         find.byKey(const Key('password_field')),
@@ -139,7 +137,8 @@ void main() {
 
       // Verify auth service was called
       verify(
-        () => mockAuthService.login('juan.perez@uat.edu.mx', 'uat2024'),
+        () =>
+            mockAuthService.login('juan.perez@docentes.uat.edu.mx', 'uat2024'),
       ).called(1);
     });
 
@@ -202,7 +201,7 @@ void main() {
       // Enter valid credentials
       await tester.enterText(
         find.byKey(const Key('username_field')),
-        'juan.perez@uat.edu.mx',
+        'juan.perez',
       );
       await tester.enterText(
         find.byKey(const Key('password_field')),
@@ -217,7 +216,8 @@ void main() {
 
       // Verify auth service was called
       verify(
-        () => mockAuthService.login('juan.perez@uat.edu.mx', 'uat2024'),
+        () =>
+            mockAuthService.login('juan.perez@docentes.uat.edu.mx', 'uat2024'),
       ).called(1);
     });
   });

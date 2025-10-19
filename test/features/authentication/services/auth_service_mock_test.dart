@@ -16,7 +16,10 @@ void main() {
         AuthResult? result;
 
         for (int i = 0; i < 5; i++) {
-          result = await authService.login('juan.perez@uat.edu.mx', 'uat2024');
+          result = await authService.login(
+            'juan.perez@docentes.uat.edu.mx',
+            'uat2024',
+          );
           if (result.isSuccess) break;
           // Esperar un poco antes del siguiente intento
           await Future.delayed(const Duration(milliseconds: 10));
@@ -27,7 +30,7 @@ void main() {
         expect(result.user, isNotNull);
         expect(result.token, isNotNull);
         expect(result.user!.name, equals('Dr. Juan Carlos Pérez García'));
-        expect(result.user!.email, equals('juan.perez@uat.edu.mx'));
+        expect(result.user!.email, equals('juan.perez@docentes.uat.edu.mx'));
         expect(result.user!.department, equals('Ingeniería en Sistemas'));
         expect(result.message, equals('Login exitoso'));
       });
@@ -77,7 +80,7 @@ void main() {
       test('failed login with invalid password', () async {
         // Act
         final result = await authService.login(
-          'juan.perez@uat.edu.mx',
+          'juan.perez@docentes.uat.edu.mx',
           'wrongpassword',
         );
 
@@ -107,7 +110,10 @@ void main() {
 
       test('failed login with empty password', () async {
         // Act
-        final result = await authService.login('juan.perez@uat.edu.mx', '');
+        final result = await authService.login(
+          'juan.perez@docentes.uat.edu.mx',
+          '',
+        );
 
         // Assert
         expect(result.isSuccess, isFalse);
@@ -122,7 +128,7 @@ void main() {
         final stopwatch = Stopwatch()..start();
 
         // Act
-        await authService.login('juan.perez@uat.edu.mx', 'uat2024');
+        await authService.login('juan.perez@docentes.uat.edu.mx', 'uat2024');
 
         // Assert
         stopwatch.stop();
@@ -139,14 +145,14 @@ void main() {
       test('generates different tokens for each login', () async {
         // Act - Add small delay between logins to ensure different timestamps
         final result1 = await authService.login(
-          'juan.perez@uat.edu.mx',
+          'juan.perez@docentes.uat.edu.mx',
           'uat2024',
         );
         await Future.delayed(
           const Duration(milliseconds: 10),
         ); // Ensure different timestamp
         final result2 = await authService.login(
-          'juan.perez@uat.edu.mx',
+          'juan.perez@docentes.uat.edu.mx',
           'uat2024',
         );
 
@@ -204,7 +210,7 @@ void main() {
         () async {
           // Arrange
           final loginResult = await authService.login(
-            'juan.perez@uat.edu.mx',
+            'juan.perez@docentes.uat.edu.mx',
             'uat2024',
           );
           expect(loginResult.isSuccess, isTrue);
@@ -219,7 +225,7 @@ void main() {
 
       test('returns null after logout (stateless service)', () async {
         // Arrange
-        await authService.login('juan.perez@uat.edu.mx', 'uat2024');
+        await authService.login('juan.perez@docentes.uat.edu.mx', 'uat2024');
         await authService.logout();
 
         // Act
@@ -245,7 +251,7 @@ void main() {
         int attempts = 0;
         do {
           loginResult = await authService.login(
-            'juan.perez@uat.edu.mx',
+            'juan.perez@docentes.uat.edu.mx',
             'uat2024',
           );
           attempts++;
@@ -314,7 +320,7 @@ void main() {
         int attempts = 0;
         do {
           loginResult = await authService.login(
-            'juan.perez@uat.edu.mx',
+            'juan.perez@docentes.uat.edu.mx',
             'uat2024',
           );
           attempts++;
@@ -346,7 +352,7 @@ void main() {
         int attempts = 0;
         do {
           loginResult = await authService.login(
-            'juan.perez@uat.edu.mx',
+            'juan.perez@docentes.uat.edu.mx',
             'uat2024',
           );
           attempts++;

@@ -76,7 +76,7 @@ void main() {
 
       // Check header elements
       expect(find.byIcon(Icons.school), findsOneWidget);
-      expect(find.text('Universidad del Atlántico'), findsOneWidget);
+      expect(find.text('Universidad Autónoma de Tamaulipas'), findsOneWidget);
       expect(find.text('Sistema de Asistencia Profesores'), findsOneWidget);
 
       // Check login form title (check if there are multiple and that's OK)

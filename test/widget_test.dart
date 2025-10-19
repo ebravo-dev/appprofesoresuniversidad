@@ -23,7 +23,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // Verify that we start on the login page
-    expect(find.text('Universidad del Atlántico'), findsOneWidget);
+    expect(find.text('Universidad Autónoma de Tamaulipas'), findsOneWidget);
     expect(find.text('Sistema de Asistencia Profesores'), findsOneWidget);
     expect(find.text('Usuario UAT'), findsOneWidget);
     expect(find.text('Contraseña'), findsOneWidget);

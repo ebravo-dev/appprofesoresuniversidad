@@ -4,9 +4,10 @@ import 'package:go_router/go_router.dart';
 import 'services/database_service.dart';
 import 'core/constants/app_constants.dart';
 import 'core/utils/utils.dart';
+import 'core/theme/uat_theme.dart';
 import 'features/authentication/presentation/pages/login_page.dart';
-import 'features/authentication/presentation/pages/dashboard_page.dart';
-import 'features/authentication/providers/auth_provider.dart';
+import 'features/groups/screens/grupos_page.dart';
+import 'features/authentication/providers/profesor_auth_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -23,10 +24,10 @@ void main() async {
 }
 
 final routerProvider = Provider<GoRouter>((ref) {
-  final authState = ref.watch(authStateProvider);
+  final authState = ref.watch(profesorAuthProvider);
 
   return GoRouter(
-    initialLocation: authState.isAuthenticated ? '/dashboard' : '/login',
+    initialLocation: authState.isAuthenticated ? '/grupos' : '/login',
     redirect: (context, state) {
       final isAuthenticated = authState.isAuthenticated;
       final isLoggingIn = state.matchedLocation == '/login';
@@ -36,9 +37,9 @@ final routerProvider = Provider<GoRouter>((ref) {
         return '/login';
       }
 
-      // If authenticated and on login page, go to dashboard
+      // If authenticated and on login page, go to grupos
       if (isAuthenticated && isLoggingIn) {
-        return '/dashboard';
+        return '/grupos';
       }
 
       // No redirect needed
@@ -46,14 +47,15 @@ final routerProvider = Provider<GoRouter>((ref) {
     },
     routes: [
       GoRoute(path: '/login', builder: (context, state) => const LoginPage()),
+      GoRoute(path: '/grupos', builder: (context, state) => const GruposPage()),
       GoRoute(
-        path: '/dashboard',
-        builder: (context, state) => const DashboardPage(),
+        path: '/dashboard', // Mantener compatibilidad
+        redirect: (context, state) => '/grupos',
       ),
       GoRoute(
         path: '/',
         redirect: (context, state) =>
-            authState.isAuthenticated ? '/dashboard' : '/login',
+            authState.isAuthenticated ? '/grupos' : '/login',
       ),
     ],
   );
@@ -68,10 +70,7 @@ class MyApp extends ConsumerWidget {
 
     return MaterialApp.router(
       title: AppConstants.appName,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
-        useMaterial3: true,
-      ),
+      theme: UATTheme.lightTheme,
       routerConfig: router,
     );
   }

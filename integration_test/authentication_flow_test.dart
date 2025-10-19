@@ -14,7 +14,7 @@ void main() {
 
       // Should start on login page - wait for it to load
       await tester.pump(const Duration(seconds: 3));
-      expect(find.text('Universidad del Atlántico'), findsOneWidget);
+      expect(find.text('Universidad Autónoma de Tamaulipas'), findsOneWidget);
       expect(find.text('Sistema de Asistencia Profesores'), findsOneWidget);
 
       // Check if we're on login page by looking for login elements
@@ -152,7 +152,7 @@ void main() {
 
       // Should be back on login page
       expect(find.byKey(const Key('username_field')), findsOneWidget);
-      expect(find.text('Universidad del Atlántico'), findsOneWidget);
+      expect(find.text('Universidad Autónoma de Tamaulipas'), findsOneWidget);
     });
 
     testWidgets('password visibility toggle works', (tester) async {

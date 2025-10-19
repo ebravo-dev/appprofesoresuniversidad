@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/theme/uat_colors.dart';
+import 'email_domain_field.dart';
 import '../../providers/auth_provider.dart';
 
 class LoginForm extends ConsumerStatefulWidget {
@@ -39,39 +41,27 @@ class _LoginFormState extends ConsumerState<LoginForm> {
       key: _formKey,
       child: Column(
         children: [
-          // Username Field
-          TextFormField(
+          // Email Field with Domain Selector
+          EmailDomainField(
             key: const Key('username_field'),
             controller: _usernameController,
             enabled: !authState.isLoading,
-            decoration: InputDecoration(
-              labelText: 'Usuario UAT',
-              hintText: 'Ingrese su usuario de la universidad',
-              prefixIcon: const Icon(Icons.person),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: Colors.grey.shade300),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: Colors.blue.shade600),
-              ),
-            ),
             validator: (value) {
               if (value == null || value.trim().isEmpty) {
                 return 'Por favor ingrese su usuario';
               }
-              if (value.trim().length < 3) {
+              if (!value.contains('@')) {
+                return 'Debe incluir un dominio válido';
+              }
+              final username = value.split('@')[0];
+              if (username.length < 3) {
                 return 'El usuario debe tener al menos 3 caracteres';
               }
               return null;
             },
             textInputAction: TextInputAction.next,
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
 
           // Password Field
           TextFormField(
@@ -81,11 +71,19 @@ class _LoginFormState extends ConsumerState<LoginForm> {
             obscureText: _obscurePassword,
             decoration: InputDecoration(
               labelText: 'Contraseña',
-              hintText: 'Ingrese su contraseña',
-              prefixIcon: const Icon(Icons.lock),
+              hintText: '••••••••',
+              prefixIcon: Icon(
+                Icons.lock_outline,
+                color: Colors.grey.shade600,
+                size: 20,
+              ),
               suffixIcon: IconButton(
                 icon: Icon(
-                  _obscurePassword ? Icons.visibility : Icons.visibility_off,
+                  _obscurePassword
+                      ? Icons.visibility_outlined
+                      : Icons.visibility_off_outlined,
+                  color: UATColors.neutral80,
+                  size: 20,
                 ),
                 onPressed: () {
                   setState(() {
@@ -93,12 +91,15 @@ class _LoginFormState extends ConsumerState<LoginForm> {
                   });
                 },
               ),
+              filled: true,
+              fillColor: UATColors.surface,
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide.none,
               ),
               enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: Colors.grey.shade300),
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide(color: Colors.grey.shade200),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -114,6 +115,7 @@ class _LoginFormState extends ConsumerState<LoginForm> {
               }
               return null;
             },
+            style: const TextStyle(fontSize: 13),
             textInputAction: TextInputAction.done,
             onFieldSubmitted: (_) => _handleLogin(),
           ),
@@ -124,19 +126,19 @@ class _LoginFormState extends ConsumerState<LoginForm> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.red.shade50,
+                color: UATColors.error.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.red.shade200),
+                border: Border.all(color: UATColors.error.withOpacity(0.3)),
               ),
               child: Row(
                 children: [
-                  Icon(Icons.error_outline, color: Colors.red.shade700),
+                  Icon(Icons.error_outline, color: UATColors.error),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       authState.errorMessage!,
                       style: TextStyle(
-                        color: Colors.red.shade700,
+                        color: UATColors.error,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -157,10 +159,11 @@ class _LoginFormState extends ConsumerState<LoginForm> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.blue.shade600,
                 foregroundColor: Colors.white,
+                elevation: 0,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(16),
                 ),
-                elevation: 2,
+                disabledBackgroundColor: Colors.grey.shade300,
               ),
               child: authState.isLoading
                   ? const SizedBox(
@@ -174,49 +177,66 @@ class _LoginFormState extends ConsumerState<LoginForm> {
                   : const Text(
                       'Iniciar Sesión',
                       style: TextStyle(
-                        fontSize: 16,
+                        fontSize: 14,
                         fontWeight: FontWeight.w600,
+                        letterSpacing: 0.5,
                       ),
                     ),
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
 
-          // Demo credentials hint
+          // Demo credentials hint - Responsive
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.blue.shade50,
+              color: UATColors.accent.withOpacity(0.05),
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.blue.shade200),
+              border: Border.all(color: UATColors.accent.withOpacity(0.2)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
-                    Icon(
-                      Icons.info_outline,
-                      color: Colors.blue.shade700,
-                      size: 16,
-                    ),
+                    Icon(Icons.info_outline, color: UATColors.accent, size: 14),
                     const SizedBox(width: 8),
-                    Text(
-                      'Credenciales de prueba:',
-                      style: TextStyle(
-                        color: Colors.blue.shade700,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 12,
+                    Expanded(
+                      child: Text(
+                        'Credenciales de prueba:',
+                        style: TextStyle(
+                          color: UATColors.accent,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 11,
+                        ),
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Usuario: juan.perez@uat.edu.mx / Contraseña: uat2024',
+                  '• juan.perez + @docentes.uat.edu.mx',
                   style: TextStyle(
-                    color: Colors.blue.shade600,
-                    fontSize: 11,
+                    color: UATColors.accent80,
+                    fontSize: 10,
+                    fontFamily: 'monospace',
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '• maria.rodriguez + @uat.edu.mx',
+                  style: TextStyle(
+                    color: UATColors.accent80,
+                    fontSize: 10,
+                    fontFamily: 'monospace',
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Contraseña: uat2024',
+                  style: TextStyle(
+                    color: UATColors.accent80,
+                    fontSize: 10,
                     fontFamily: 'monospace',
                   ),
                 ),
