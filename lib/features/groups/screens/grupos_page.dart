@@ -84,29 +84,9 @@ class _GruposPageState extends ConsumerState<GruposPage> {
               letterSpacing: 0.4,
             ),
           ),
-          Row(
-            children: [
-              IconButton(
-                icon: Icon(
-                  isLoading ? Icons.hourglass_empty : Icons.add_circle_outline,
-                  color: Colors.white,
-                  size: 28,
-                ),
-                onPressed: isLoading
-                    ? null
-                    : () {
-                        ref.read(profesorAuthProvider.notifier).refreshGrupos();
-                      },
-              ),
-              IconButton(
-                icon: const Icon(
-                  Icons.more_horiz,
-                  color: Colors.white,
-                  size: 28,
-                ),
-                onPressed: () => _showOptionsMenu(context),
-              ),
-            ],
+          IconButton(
+            icon: const Icon(Icons.more_horiz, color: Colors.white, size: 28),
+            onPressed: () => _showOptionsMenu(context),
           ),
         ],
       ),
@@ -169,69 +149,33 @@ class _GruposPageState extends ConsumerState<GruposPage> {
   }
 
   Widget _buildWalletCards(List<Grupo> grupos) {
-    return RefreshIndicator(
-      onRefresh: () async {
-        await ref.read(profesorAuthProvider.notifier).refreshGrupos();
-      },
-      backgroundColor: Colors.grey.shade900,
-      color: Colors.white,
-      child: ListView.builder(
-        controller: _scrollController,
-        padding: const EdgeInsets.only(
-          left: 16,
-          right: 16,
-          top: 8,
-          bottom: 100,
-        ),
-        itemCount: grupos.length,
-        physics: const BouncingScrollPhysics(),
-        itemBuilder: (context, index) {
-          return _buildStackedCard(grupos[index], index, grupos.length);
-        },
-      ),
-    );
-  }
+    // Altura visible de cada tarjeta empalmada (como en Wallet)
+    const cardPeekHeight = 50.0;
+    const cardHeight = 200.0;
 
-  Widget _buildStackedCard(Grupo grupo, int index, int totalCards) {
-    // Offset para el efecto de apilamiento
-    final double topOffset =
-        index * 8.0; // Cada tarjeta se desplaza 8px hacia abajo
-    final double scale =
-        1.0 - (index * 0.02); // Cada tarjeta es ligeramente más pequeña
+    // Calcular altura total del contenido
+    final totalHeight = cardHeight + (grupos.length - 1) * cardPeekHeight;
 
-    return AnimatedBuilder(
-      animation: _scrollController,
-      builder: (context, child) {
-        double offset = 0;
-        if (_scrollController.hasClients) {
-          offset = _scrollController.offset;
-        }
-
-        // Calcula la opacidad y transformación basada en el scroll
-        final itemOffset = topOffset - offset;
-        final shouldAnimate = itemOffset < 0;
-        final animationProgress = shouldAnimate
-            ? (itemOffset.abs() / 100).clamp(0.0, 1.0)
-            : 0.0;
-
-        return Transform.translate(
-          offset: Offset(0, shouldAnimate ? itemOffset.abs() * 0.5 : topOffset),
-          child: Transform.scale(
-            scale: shouldAnimate ? scale - (animationProgress * 0.1) : scale,
-            child: Opacity(
-              opacity: 1.0 - (animationProgress * 0.5),
-              child: child,
-            ),
-          ),
-        );
-      },
+    return SingleChildScrollView(
+      controller: _scrollController,
+      physics: const BouncingScrollPhysics(),
       child: Padding(
-        padding: EdgeInsets.only(
-          bottom: index == totalCards - 1
-              ? 0
-              : 240, // Espacio para ver las tarjetas apiladas
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: SizedBox(
+          height: totalHeight,
+          child: Stack(
+            children: grupos.asMap().entries.map((entry) {
+              final index = entry.key;
+              final grupo = entry.value;
+              return Positioned(
+                top: index * cardPeekHeight,
+                left: 0,
+                right: 0,
+                child: _buildWalletCard(grupo, index),
+              );
+            }).toList(),
+          ),
         ),
-        child: _buildWalletCard(grupo, index),
       ),
     );
   }
@@ -271,17 +215,18 @@ class _GruposPageState extends ConsumerState<GruposPage> {
 
     return Hero(
       tag: 'grupo_card_$index',
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 16),
-        height: 220,
+      child: SizedBox(
+        height: 200,
         child: TweenAnimationBuilder<double>(
           duration: Duration(milliseconds: 300 + (index * 100)),
-          curve: Curves.easeOutBack,
+          curve: Curves.easeOut,
           tween: Tween(begin: 0.0, end: 1.0),
           builder: (context, value, child) {
+            // Clamp value to ensure it stays within valid range
+            final clampedValue = value.clamp(0.0, 1.0);
             return Transform.scale(
-              scale: 0.8 + (value * 0.2),
-              child: Opacity(opacity: value, child: child),
+              scale: 0.8 + (clampedValue * 0.2),
+              child: Opacity(opacity: clampedValue, child: child),
             );
           },
           child: ClipRRect(
@@ -524,18 +469,6 @@ class _GruposPageState extends ConsumerState<GruposPage> {
               const SizedBox(height: 8),
 
               // Opciones
-              ListTile(
-                leading: const Icon(Icons.refresh, color: Colors.white),
-                title: const Text(
-                  'Actualizar Clases',
-                  style: TextStyle(color: Colors.white),
-                ),
-                onTap: () {
-                  Navigator.pop(context);
-                  ref.read(profesorAuthProvider.notifier).refreshGrupos();
-                },
-              ),
-
               ListTile(
                 leading: const Icon(Icons.logout, color: Colors.red),
                 title: const Text(
