@@ -6,133 +6,88 @@ import '../../../../shared/models/grupo.dart';
 import '../../../../shared/models/profesor.dart';
 import '../../authentication/providers/profesor_auth_provider.dart';
 
-class GruposPage extends ConsumerWidget {
+class GruposPage extends ConsumerStatefulWidget {
   const GruposPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<GruposPage> createState() => _GruposPageState();
+}
+
+class _GruposPageState extends ConsumerState<GruposPage> {
+  int? _expandedIndex;
+
+  @override
+  Widget build(BuildContext context) {
     final profesor = ref.watch(currentProfesorProvider);
     final grupos = ref.watch(profesorGruposProvider);
     final isLoading = ref.watch(profesorAuthLoadingProvider);
 
     return Scaffold(
-      backgroundColor: UATColors.surface,
-      appBar: AppBar(
-        title: const Text('Mis Grupos'),
-        backgroundColor: UATColors.primary,
-        foregroundColor: UATColors.onPrimary,
-        elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: isLoading
-                ? null
-                : () {
-                    ref.read(profesorAuthProvider.notifier).refreshGrupos();
-                  },
-          ),
-          PopupMenuButton<String>(
-            onSelected: (value) {
-              if (value == 'logout') {
-                _showLogoutDialog(context, ref);
-              }
-            },
-            itemBuilder: (context) => [
-              PopupMenuItem(
-                value: 'logout',
-                child: Row(
-                  children: [
-                    Icon(Icons.logout, color: Colors.red.shade600),
-                    const SizedBox(width: 8),
-                    const Text('Cerrar Sesión'),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          // Profesor info header
-          if (profesor != null) _buildProfesorHeader(profesor),
+      backgroundColor: Colors.black,
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Header estilo Wallet
+            _buildWalletHeader(context, profesor, isLoading),
 
-          // Grupos content
-          Expanded(
-            child: isLoading && grupos.isEmpty
-                ? _buildLoadingState()
-                : grupos.isEmpty
-                ? _buildEmptyState(ref)
-                : _buildGruposList(grupos),
-          ),
-        ],
+            // Grupos como tarjetas apiladas
+            Expanded(
+              child: isLoading && grupos.isEmpty
+                  ? _buildLoadingState()
+                  : grupos.isEmpty
+                      ? _buildEmptyState()
+                      : _buildWalletCards(grupos),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildProfesorHeader(Profesor profesor) {
-    // Obtener la primera letra del email
-    final firstLetter = profesor.email.isNotEmpty
-        ? profesor.email[0].toUpperCase()
-        : 'P';
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [UATColors.primary, UATColors.primary.withOpacity(0.8)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: const BorderRadius.only(
-          bottomLeft: Radius.circular(24),
-          bottomRight: Radius.circular(24),
-        ),
-      ),
-      child: SafeArea(
-        child: Row(
-          children: [
-            CircleAvatar(
-              radius: 28,
-              backgroundColor: UATColors.onPrimary,
-              child: Text(
-                firstLetter,
-                style: TextStyle(
-                  color: UATColors.primary,
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
+  Widget _buildWalletHeader(
+    BuildContext context,
+    Profesor? profesor,
+    bool isLoading,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          const Text(
+            'Mis Clases',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 34,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 0.4,
+            ),
+          ),
+          Row(
+            children: [
+              IconButton(
+                icon: Icon(
+                  isLoading ? Icons.hourglass_empty : Icons.add_circle_outline,
+                  color: Colors.white,
+                  size: 28,
                 ),
+                onPressed: isLoading
+                    ? null
+                    : () {
+                        ref.read(profesorAuthProvider.notifier).refreshGrupos();
+                      },
               ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Bienvenido/a',
-                    style: TextStyle(
-                      color: UATColors.onPrimary.withOpacity(0.9),
-                      fontSize: 14,
-                      fontWeight: FontWeight.w400,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    profesor.email,
-                    style: TextStyle(
-                      color: UATColors.onPrimary,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
+              IconButton(
+                icon: const Icon(
+                  Icons.more_horiz,
+                  color: Colors.white,
+                  size: 28,
+                ),
+                onPressed: () => _showOptionsMenu(context),
               ),
-            ),
-          ],
-        ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -142,48 +97,55 @@ class GruposPage extends ConsumerWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          CircularProgressIndicator(),
+          CircularProgressIndicator(color: Colors.white),
           SizedBox(height: 16),
-          Text('Cargando grupos...'),
+          Text(
+            'Cargando grupos...',
+            style: TextStyle(color: Colors.white70),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildEmptyState(WidgetRef ref) {
+  Widget _buildEmptyState() {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.group_outlined, size: 64, color: UATColors.neutral60),
-            const SizedBox(height: 16),
-            Text(
-              'No tienes grupos asignados',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                color: UATColors.neutral,
+            Container(
+              width: 120,
+              height: 120,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade900,
+                shape: BoxShape.circle,
               ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Contacta al administrador si crees que esto es un error.',
-              style: TextStyle(color: UATColors.neutral80),
-              textAlign: TextAlign.center,
+              child: const Icon(
+                Icons.school_outlined,
+                size: 64,
+                color: Colors.grey,
+              ),
             ),
             const SizedBox(height: 24),
-            ElevatedButton.icon(
-              onPressed: () {
-                ref.read(profesorAuthProvider.notifier).refreshGrupos();
-              },
-              icon: const Icon(Icons.refresh),
-              label: const Text('Actualizar'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: UATColors.primary,
-                foregroundColor: UATColors.onPrimary,
+            const Text(
+              'No tienes clases asignadas',
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
               ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Contacta al administrador si crees que esto es un error.',
+              style: TextStyle(
+                fontSize: 16,
+                color: Colors.grey.shade400,
+              ),
+              textAlign: TextAlign.center,
             ),
           ],
         ),
@@ -191,160 +153,228 @@ class GruposPage extends ConsumerWidget {
     );
   }
 
-  Widget _buildGruposList(List<Grupo> grupos) {
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: grupos.length,
-      itemBuilder: (context, index) {
-        final grupo = grupos[index];
-        return _buildGrupoCard(grupo);
+  Widget _buildWalletCards(List<Grupo> grupos) {
+    return RefreshIndicator(
+      onRefresh: () async {
+        await ref.read(profesorAuthProvider.notifier).refreshGrupos();
       },
+      backgroundColor: Colors.grey.shade900,
+      color: Colors.white,
+      child: ListView.builder(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        itemCount: grupos.length,
+        itemBuilder: (context, index) {
+          return _buildWalletCard(grupos[index], index);
+        },
+      ),
     );
   }
 
-  Widget _buildGrupoCard(Grupo grupo) {
+  Widget _buildWalletCard(Grupo grupo, int index) {
+    // Colores inspirados en Wallet (tarjetas de crédito/débito)
+    final cardColors = [
+      {
+        'gradient': [const Color(0xFF6B4CE6), const Color(0xFF9B7EF5)],
+        'accent': Colors.white
+      }, // Purple
+      {
+        'gradient': [const Color(0xFFFF6B6B), const Color(0xFFFF8E8E)],
+        'accent': Colors.white
+      }, // Red/Pink
+      {
+        'gradient': [const Color(0xFF4ECDC4), const Color(0xFF44A08D)],
+        'accent': Colors.white
+      }, // Teal
+      {
+        'gradient': [const Color(0xFFFF9A56), const Color(0xFFFFB87A)],
+        'accent': Colors.white
+      }, // Orange
+      {
+        'gradient': [const Color(0xFF5F9EE8), const Color(0xFF7FB3F0)],
+        'accent': Colors.white
+      }, // Blue
+      {
+        'gradient': [const Color(0xFFE85F99), const Color(0xFFF07BA8)],
+        'accent': Colors.white
+      }, // Pink
+    ];
+
+    final colorScheme = cardColors[index % cardColors.length];
+    final gradientColors = colorScheme['gradient'] as List<Color>;
+    final accentColor = colorScheme['accent'] as Color;
+
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: Card(
-        elevation: 2,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(16),
-          onTap: () {
-            // TODO: Navegar a detalles del grupo o toma de asistencia
-          },
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: UATColors.primary.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8),
+      margin: const EdgeInsets.only(bottom: 16),
+      height: 220,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () {
+              setState(() {
+                _expandedIndex = _expandedIndex == index ? null : index;
+              });
+            },
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: gradientColors,
+                ),
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: gradientColors[0].withOpacity(0.3),
+                    blurRadius: 20,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Header con badge tipo "débito/crédito"
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: accentColor.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: accentColor.withOpacity(0.3),
+                          ),
+                        ),
+                        child: Text(
+                          grupo.nombre.toUpperCase(),
+                          style: TextStyle(
+                            color: accentColor,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 1.2,
+                          ),
+                        ),
                       ),
-                      child: Icon(
-                        Icons.class_,
-                        color: UATColors.primary,
-                        size: 20,
+                      Icon(
+                        Icons.contactless,
+                        color: accentColor.withOpacity(0.3),
+                        size: 28,
                       ),
+                    ],
+                  ),
+
+                  const Spacer(),
+
+                  // Nombre de la materia (estilo número de tarjeta)
+                  Text(
+                    grupo.materia,
+                    style: TextStyle(
+                      color: accentColor,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
+                      height: 1.2,
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // Info del grupo
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            grupo.nombre,
-                            style: const TextStyle(
+                            'AULA',
+                            style: TextStyle(
+                              color: accentColor.withOpacity(0.7),
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 1,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            grupo.aula,
+                            style: TextStyle(
+                              color: accentColor,
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
+                        ],
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
                           Text(
-                            grupo.materia,
+                            'PERIODO',
                             style: TextStyle(
-                              fontSize: 14,
-                              color: UATColors.neutral80,
+                              color: accentColor.withOpacity(0.7),
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 1,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'P${grupo.period}',
+                            style: TextStyle(
+                              color: accentColor,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
                         ],
                       ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            'ESTUDIANTES',
+                            style: TextStyle(
+                              color: accentColor.withOpacity(0.7),
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 1,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.people_rounded,
+                                color: accentColor,
+                                size: 16,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                '${grupo.totalAlumnos}',
+                                style: TextStyle(
+                                  color: accentColor,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
-                      decoration: BoxDecoration(
-                        color: Colors.blue.shade50,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.blue.shade200),
-                      ),
-                      child: Text(
-                        '${grupo.totalAlumnos} estudiantes',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.blue.shade700,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 12),
-
-                // Información adicional del grupo
-                Row(
-                  children: [
-                    Icon(
-                      Icons.meeting_room,
-                      size: 14,
-                      color: UATColors.neutral60,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      'Aula: ${grupo.aula}',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: UATColors.neutral60,
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Icon(
-                      Icons.calendar_today,
-                      size: 14,
-                      color: UATColors.neutral60,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      'Periodo: ${grupo.period}',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: UATColors.neutral60,
-                      ),
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 8),
-
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    TextButton.icon(
-                      onPressed: () {
-                        // TODO: Ver lista de alumnos
-                      },
-                      icon: const Icon(Icons.people, size: 16),
-                      label: const Text('Ver Alumnos'),
-                      style: TextButton.styleFrom(
-                        foregroundColor: UATColors.primary,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    ElevatedButton.icon(
-                      onPressed: () {
-                        // TODO: Tomar asistencia
-                      },
-                      icon: const Icon(Icons.check_circle, size: 16),
-                      label: const Text('Asistencia'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: UATColors.primary,
-                        foregroundColor: UATColors.onPrimary,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -352,23 +382,129 @@ class GruposPage extends ConsumerWidget {
     );
   }
 
-  void _showLogoutDialog(BuildContext context, WidgetRef ref) {
+  void _showOptionsMenu(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.grey.shade900,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        final profesor = ref.read(currentProfesorProvider);
+        return Container(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Avatar y nombre
+              Row(
+                children: [
+                  CircleAvatar(
+                    radius: 24,
+                    backgroundColor: UATColors.primary,
+                    child: Text(
+                      profesor?.email[0].toUpperCase() ?? 'P',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          profesor?.name ?? 'Profesor',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        Text(
+                          profesor?.email ?? '',
+                          style: TextStyle(
+                            color: Colors.grey.shade400,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 24),
+              const Divider(color: Colors.grey),
+              const SizedBox(height: 8),
+
+              // Opciones
+              ListTile(
+                leading: const Icon(Icons.refresh, color: Colors.white),
+                title: const Text(
+                  'Actualizar Clases',
+                  style: TextStyle(color: Colors.white),
+                ),
+                onTap: () {
+                  Navigator.pop(context);
+                  ref.read(profesorAuthProvider.notifier).refreshGrupos();
+                },
+              ),
+
+              ListTile(
+                leading: const Icon(Icons.logout, color: Colors.red),
+                title: const Text(
+                  'Cerrar Sesión',
+                  style: TextStyle(color: Colors.red),
+                ),
+                onTap: () {
+                  Navigator.pop(context);
+                  _showLogoutDialog(context);
+                },
+              ),
+
+              SizedBox(height: MediaQuery.of(context).padding.bottom),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showLogoutDialog(BuildContext context) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Cerrar Sesión'),
-        content: const Text('¿Estás seguro de que quieres cerrar sesión?'),
+        backgroundColor: Colors.grey.shade900,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        title: const Row(
+          children: [
+            Icon(Icons.logout_rounded, color: Colors.red),
+            SizedBox(width: 12),
+            Text('Cerrar Sesión', style: TextStyle(color: Colors.white)),
+          ],
+        ),
+        content: const Text(
+          '¿Estás seguro de que quieres cerrar sesión?',
+          style: TextStyle(fontSize: 16, color: Colors.white70),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancelar'),
+            child: const Text('Cancelar', style: TextStyle(color: Colors.white70)),
           ),
-          ElevatedButton(
+          FilledButton(
             onPressed: () async {
               Navigator.of(context).pop();
               await ref.read(profesorAuthProvider.notifier).logout();
             },
-            style: ElevatedButton.styleFrom(
+            style: FilledButton.styleFrom(
               backgroundColor: Colors.red,
               foregroundColor: Colors.white,
             ),
@@ -378,4 +514,5 @@ class GruposPage extends ConsumerWidget {
       ),
     );
   }
+
 }
