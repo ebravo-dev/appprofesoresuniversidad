@@ -14,13 +14,43 @@ class GruposPage extends ConsumerStatefulWidget {
   ConsumerState<GruposPage> createState() => _GruposPageState();
 }
 
-class _GruposPageState extends ConsumerState<GruposPage> {
+class _GruposPageState extends ConsumerState<GruposPage>
+    with SingleTickerProviderStateMixin {
   int? _expandedIndex;
   final ScrollController _scrollController = ScrollController();
+  bool _isExpanded = false; // Control de expansión de tarjetas
+  late AnimationController _pulseController;
+
+  // Horas de ejemplo proporcionadas por el usuario para mostrar mientras no hay horarios reales
+  static const List<String> _placeholderHoras = <String>[
+    '10:00-11:00',
+    '13:00-14:00',
+    '16:00-17:00',
+    '19:00-20:00',
+    '20:00-21:00',
+    '20:00-21:00',
+    '20:00-21:00',
+  ];
+
+  // Días de la semana para cada clase
+  static const List<String> _placeholderDias = <String>[
+    'L-J',
+    'L-V',
+    'Ma,J',
+    'Mi-V',
+    'L-M',
+  ];
 
   @override
   void initState() {
     super.initState();
+
+    // Animación pulsante para el indicador de clase actual
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    )..repeat(reverse: true);
+
     // Configurar status bar para tema oscuro
     SystemChrome.setSystemUIOverlayStyle(
       const SystemUiOverlayStyle(
@@ -34,6 +64,7 @@ class _GruposPageState extends ConsumerState<GruposPage> {
   @override
   void dispose() {
     _scrollController.dispose();
+    _pulseController.dispose();
     super.dispose();
   }
 
@@ -84,9 +115,29 @@ class _GruposPageState extends ConsumerState<GruposPage> {
               letterSpacing: 0.4,
             ),
           ),
-          IconButton(
-            icon: const Icon(Icons.more_horiz, color: Colors.white, size: 28),
-            onPressed: () => _showOptionsMenu(context),
+          Row(
+            children: [
+              IconButton(
+                icon: Icon(
+                  _isExpanded ? Icons.unfold_less : Icons.unfold_more,
+                  color: Colors.white,
+                  size: 28,
+                ),
+                onPressed: () {
+                  setState(() {
+                    _isExpanded = !_isExpanded;
+                  });
+                },
+              ),
+              IconButton(
+                icon: const Icon(
+                  Icons.more_horiz,
+                  color: Colors.white,
+                  size: 28,
+                ),
+                onPressed: () => _showOptionsMenu(context),
+              ),
+            ],
           ),
         ],
       ),
@@ -150,7 +201,9 @@ class _GruposPageState extends ConsumerState<GruposPage> {
 
   Widget _buildWalletCards(List<Grupo> grupos) {
     // Altura visible de cada tarjeta empalmada (como en Wallet)
-    const cardPeekHeight = 50.0;
+    final cardPeekHeight = _isExpanded
+        ? 120.0
+        : 65.0; // Más espacio para ver los intervalos de días
     const cardHeight = 200.0;
 
     // Calcular altura total del contenido
@@ -161,17 +214,24 @@ class _GruposPageState extends ConsumerState<GruposPage> {
       physics: const BouncingScrollPhysics(),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        child: SizedBox(
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 400),
+          curve: Curves.easeInOut,
           height: totalHeight,
           child: Stack(
             children: grupos.asMap().entries.map((entry) {
               final index = entry.key;
               final grupo = entry.value;
-              return Positioned(
+              // TODO: Reemplazar con lógica real de horarios
+              // La última tarjeta (la que está al frente) es la clase actual
+              final isCurrentClass = index == grupos.length - 1;
+              return AnimatedPositioned(
+                duration: const Duration(milliseconds: 400),
+                curve: Curves.easeInOut,
                 top: index * cardPeekHeight,
                 left: 0,
                 right: 0,
-                child: _buildWalletCard(grupo, index),
+                child: _buildWalletCard(grupo, index, isCurrentClass),
               );
             }).toList(),
           ),
@@ -180,7 +240,7 @@ class _GruposPageState extends ConsumerState<GruposPage> {
     );
   }
 
-  Widget _buildWalletCard(Grupo grupo, int index) {
+  Widget _buildWalletCard(Grupo grupo, int index, bool isCurrentClass) {
     // Colores inspirados en Wallet (tarjetas de crédito/débito)
     final cardColors = [
       {
@@ -229,179 +289,272 @@ class _GruposPageState extends ConsumerState<GruposPage> {
               child: Opacity(opacity: clampedValue, child: child),
             );
           },
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(16),
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: () {
-                  HapticFeedback.lightImpact();
-                  setState(() {
-                    _expandedIndex = _expandedIndex == index ? null : index;
-                  });
-                },
-                child: Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: gradientColors,
-                    ),
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: gradientColors[0].withOpacity(0.3),
-                        blurRadius: 20,
-                        offset: const Offset(0, 8),
-                      ),
-                    ],
-                  ),
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Header con badge tipo "débito/crédito"
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 6,
-                            ),
-                            decoration: BoxDecoration(
-                              color: accentColor.withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: accentColor.withOpacity(0.3),
-                              ),
-                            ),
-                            child: Text(
-                              grupo.nombre.toUpperCase(),
-                              style: TextStyle(
-                                color: accentColor,
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 1.2,
-                              ),
-                            ),
+          child: AnimatedBuilder(
+            animation: _pulseController,
+            builder: (context, child) {
+              // Animación de pulso solo para la clase actual
+              final pulseValue = isCurrentClass
+                  ? Tween<double>(begin: 1.0, end: 1.01)
+                        .animate(
+                          CurvedAnimation(
+                            parent: _pulseController,
+                            curve: Curves.easeInOut,
                           ),
-                          Icon(
-                            Icons.contactless,
-                            color: accentColor.withOpacity(0.3),
-                            size: 28,
-                          ),
-                        ],
-                      ),
+                        )
+                        .value
+                  : 1.0;
 
-                      const Spacer(),
-
-                      // Nombre de la materia (estilo número de tarjeta)
-                      Text(
-                        grupo.materia,
-                        style: TextStyle(
-                          color: accentColor,
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 0.5,
-                          height: 1.2,
+              return Transform.scale(
+                scale: pulseValue,
+                child: Stack(
+                  children: [
+                    // Borde brillante animado para clase actual
+                    if (isCurrentClass)
+                      Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: accentColor.withOpacity(
+                                0.15 + (_pulseController.value * 0.1),
+                              ),
+                              blurRadius: 12,
+                              spreadRadius: 0,
+                            ),
+                          ],
                         ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: accentColor.withOpacity(0.6),
+                              width: 2,
+                            ),
+                          ),
+                        ),
                       ),
-
-                      const SizedBox(height: 16),
-
-                      // Info del grupo
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'AULA',
-                                style: TextStyle(
-                                  color: accentColor.withOpacity(0.7),
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w600,
-                                  letterSpacing: 1,
-                                ),
+                    // Tarjeta principal
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(16),
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: () {
+                            HapticFeedback.lightImpact();
+                            setState(() {
+                              _expandedIndex = _expandedIndex == index
+                                  ? null
+                                  : index;
+                            });
+                          },
+                          child: Container(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: gradientColors,
                               ),
-                              const SizedBox(height: 2),
-                              Text(
-                                grupo.aula,
-                                style: TextStyle(
-                                  color: accentColor,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'PERIODO',
-                                style: TextStyle(
-                                  color: accentColor.withOpacity(0.7),
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w600,
-                                  letterSpacing: 1,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                'P${grupo.period}',
-                                style: TextStyle(
-                                  color: accentColor,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              Text(
-                                'ESTUDIANTES',
-                                style: TextStyle(
-                                  color: accentColor.withOpacity(0.7),
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w600,
-                                  letterSpacing: 1,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Row(
-                                children: [
-                                  Icon(
-                                    Icons.people_rounded,
-                                    color: accentColor,
-                                    size: 16,
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: gradientColors[0].withOpacity(
+                                    isCurrentClass ? 0.3 : 0.2,
                                   ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    '${grupo.totalAlumnos}',
-                                    style: TextStyle(
-                                      color: accentColor,
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w600,
+                                  blurRadius: isCurrentClass ? 20 : 15,
+                                  offset: const Offset(0, 6),
+                                ),
+                              ],
+                            ),
+                            padding: const EdgeInsets.all(24),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Header con badge del grupo y hora
+                                Stack(
+                                  clipBehavior: Clip.none,
+                                  children: [
+                                    Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 12,
+                                            vertical: 6,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: accentColor.withOpacity(0.2),
+                                            borderRadius: BorderRadius.circular(
+                                              8,
+                                            ),
+                                            border: Border.all(
+                                              color: accentColor.withOpacity(
+                                                0.3,
+                                              ),
+                                            ),
+                                          ),
+                                          child: Text(
+                                            grupo.aula,
+                                            style: TextStyle(
+                                              color: accentColor,
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.bold,
+                                              letterSpacing: 1.2,
+                                            ),
+                                          ),
+                                        ),
+                                        // TODO: Reemplazar con horario real cuando esté en el modelo
+                                        Text(
+                                          _placeholderHoras[index %
+                                              _placeholderHoras.length],
+                                          style: TextStyle(
+                                            color: accentColor.withOpacity(0.8),
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w600,
+                                            letterSpacing: 0.5,
+                                          ),
+                                        ),
+                                      ],
                                     ),
+                                    // Días flotando abajo a la derecha
+                                    Positioned(
+                                      right: 0,
+                                      top: 22,
+                                      child: Text(
+                                        _placeholderDias[index %
+                                            _placeholderDias.length],
+                                        style: TextStyle(
+                                          color: accentColor.withOpacity(0.6),
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w500,
+                                          letterSpacing: 0.5,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+
+                                const SizedBox(height: 16),
+
+                                // Nombre de la materia (sin código entre paréntesis)
+                                Text(
+                                  grupo.materia
+                                      .replaceAll(RegExp(r'\([^)]*\)\s*'), '')
+                                      .trim(),
+                                  style: TextStyle(
+                                    color: accentColor,
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 0.5,
+                                    height: 1.2,
                                   ),
-                                ],
-                              ),
-                            ],
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+
+                                const Spacer(),
+
+                                const SizedBox(height: 16),
+
+                                // Info del grupo
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'GRUPO',
+                                          style: TextStyle(
+                                            color: accentColor.withOpacity(0.7),
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w600,
+                                            letterSpacing: 1,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          grupo.group,
+                                          style: TextStyle(
+                                            color: accentColor,
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'PERIODO',
+                                          style: TextStyle(
+                                            color: accentColor.withOpacity(0.7),
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w600,
+                                            letterSpacing: 1,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          'P${grupo.period}',
+                                          style: TextStyle(
+                                            color: accentColor,
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.end,
+                                      children: [
+                                        Text(
+                                          'ESTUDIANTES',
+                                          style: TextStyle(
+                                            color: accentColor.withOpacity(0.7),
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w600,
+                                            letterSpacing: 1,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Row(
+                                          children: [
+                                            Icon(
+                                              Icons.people_rounded,
+                                              color: accentColor,
+                                              size: 16,
+                                            ),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              '${grupo.totalAlumnos}',
+                                              style: TextStyle(
+                                                color: accentColor,
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
                           ),
-                        ],
+                        ),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-              ),
-            ),
+              );
+            },
           ),
         ),
       ),
