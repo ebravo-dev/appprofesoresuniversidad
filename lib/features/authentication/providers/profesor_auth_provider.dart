@@ -265,13 +265,25 @@ class ProfesorAuthNotifier extends StateNotifier<ProfesorAuthState> {
         } else {
           Logger.info('Sesión inválida o expirada');
           await _authStorage.clearSession();
+          // Establecer estado explícitamente como no autenticado
+          state = const ProfesorAuthState(
+            status: ProfesorAuthStatus.unauthenticated,
+          );
         }
       } else {
         Logger.info('No hay sesión almacenada');
+        // Establecer estado explícitamente como no autenticado
+        state = const ProfesorAuthState(
+          status: ProfesorAuthStatus.unauthenticated,
+        );
       }
     } catch (e, stackTrace) {
       Logger.error('Error verificando sesión almacenada', e, stackTrace);
       await _authStorage.clearSession();
+      // Establecer estado explícitamente como no autenticado en caso de error
+      state = const ProfesorAuthState(
+        status: ProfesorAuthStatus.unauthenticated,
+      );
     }
   }
 

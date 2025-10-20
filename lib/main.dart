@@ -124,6 +124,9 @@ class _MyAppState extends ConsumerState<MyApp> {
       Logger.info('Verificación de sesión completada');
     } catch (e, stackTrace) {
       Logger.error('Error verificando sesión almacenada', e, stackTrace);
+      // Si hay error, asegurar que el estado quede en unauthenticated
+      // para que el usuario pueda hacer login sin problemas
+      ref.read(profesorAuthProvider.notifier).clearError();
     } finally {
       if (mounted) {
         setState(() {

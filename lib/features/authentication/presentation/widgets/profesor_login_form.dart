@@ -35,7 +35,11 @@ class _ProfesorLoginFormState extends ConsumerState<ProfesorLoginForm> {
 
   @override
   void dispose() {
-    EmailSuggestionOverlay.hide(); // Limpiar overlay
+    try {
+      EmailSuggestionOverlay.hide(); // Limpiar overlay
+    } catch (e) {
+      // Ignorar errores al limpiar overlay
+    }
     _nameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
@@ -111,8 +115,12 @@ class _ProfesorLoginFormState extends ConsumerState<ProfesorLoginForm> {
 
   void _handleSubmit() {
     if (_formKey.currentState?.validate() ?? false) {
-      // Guardar credenciales en el autofill del sistema
-      TextInput.finishAutofillContext();
+      try {
+        // Guardar credenciales en el autofill del sistema
+        TextInput.finishAutofillContext();
+      } catch (e) {
+        // Ignorar errores de autofill en iOS
+      }
 
       if (_isLoginMode) {
         ref
