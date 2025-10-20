@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theme/uat_colors.dart';
@@ -15,6 +16,26 @@ class GruposPage extends ConsumerStatefulWidget {
 
 class _GruposPageState extends ConsumerState<GruposPage> {
   int? _expandedIndex;
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    // Configurar status bar para tema oscuro
+    SystemChrome.setSystemUIOverlayStyle(
+      const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.light,
+        statusBarBrightness: Brightness.dark,
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -35,8 +56,8 @@ class _GruposPageState extends ConsumerState<GruposPage> {
               child: isLoading && grupos.isEmpty
                   ? _buildLoadingState()
                   : grupos.isEmpty
-                      ? _buildEmptyState()
-                      : _buildWalletCards(grupos),
+                  ? _buildEmptyState()
+                  : _buildWalletCards(grupos),
             ),
           ],
         ),
@@ -99,10 +120,7 @@ class _GruposPageState extends ConsumerState<GruposPage> {
         children: [
           CircularProgressIndicator(color: Colors.white),
           SizedBox(height: 16),
-          Text(
-            'Cargando grupos...',
-            style: TextStyle(color: Colors.white70),
-          ),
+          Text('Cargando grupos...', style: TextStyle(color: Colors.white70)),
         ],
       ),
     );
@@ -141,10 +159,7 @@ class _GruposPageState extends ConsumerState<GruposPage> {
             const SizedBox(height: 12),
             Text(
               'Contacta al administrador si crees que esto es un error.',
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey.shade400,
-              ),
+              style: TextStyle(fontSize: 16, color: Colors.grey.shade400),
               textAlign: TextAlign.center,
             ),
           ],
@@ -161,11 +176,53 @@ class _GruposPageState extends ConsumerState<GruposPage> {
       backgroundColor: Colors.grey.shade900,
       color: Colors.white,
       child: ListView.builder(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        controller: _scrollController,
+        padding: const EdgeInsets.only(left: 16, right: 16, top: 8, bottom: 100),
         itemCount: grupos.length,
+        physics: const BouncingScrollPhysics(),
         itemBuilder: (context, index) {
-          return _buildWalletCard(grupos[index], index);
+          return _buildStackedCard(grupos[index], index, grupos.length);
         },
+      ),
+    );
+  }
+
+  Widget _buildStackedCard(Grupo grupo, int index, int totalCards) {
+    // Offset para el efecto de apilamiento
+    final double topOffset = index * 8.0; // Cada tarjeta se desplaza 8px hacia abajo
+    final double scale = 1.0 - (index * 0.02); // Cada tarjeta es ligeramente más pequeña
+    
+    return AnimatedBuilder(
+      animation: _scrollController,
+      builder: (context, child) {
+        double offset = 0;
+        if (_scrollController.hasClients) {
+          offset = _scrollController.offset;
+        }
+        
+        // Calcula la opacidad y transformación basada en el scroll
+        final itemOffset = topOffset - offset;
+        final shouldAnimate = itemOffset < 0;
+        final animationProgress = shouldAnimate 
+            ? (itemOffset.abs() / 100).clamp(0.0, 1.0) 
+            : 0.0;
+        
+        return Transform.translate(
+          offset: Offset(0, shouldAnimate ? itemOffset.abs() * 0.5 : topOffset),
+          child: Transform.scale(
+            scale: shouldAnimate ? scale - (animationProgress * 0.1) : scale,
+            child: Opacity(
+              opacity: 1.0 - (animationProgress * 0.5),
+              child: child,
+            ),
+          ),
+        );
+      },
+      child: Padding(
+        padding: EdgeInsets.only(
+          bottom: index == totalCards - 1 ? 0 : 240, // Espacio para ver las tarjetas apiladas
+        ),
+        child: _buildWalletCard(grupo, index),
       ),
     );
   }
@@ -175,27 +232,27 @@ class _GruposPageState extends ConsumerState<GruposPage> {
     final cardColors = [
       {
         'gradient': [const Color(0xFF6B4CE6), const Color(0xFF9B7EF5)],
-        'accent': Colors.white
+        'accent': Colors.white,
       }, // Purple
       {
         'gradient': [const Color(0xFFFF6B6B), const Color(0xFFFF8E8E)],
-        'accent': Colors.white
+        'accent': Colors.white,
       }, // Red/Pink
       {
         'gradient': [const Color(0xFF4ECDC4), const Color(0xFF44A08D)],
-        'accent': Colors.white
+        'accent': Colors.white,
       }, // Teal
       {
         'gradient': [const Color(0xFFFF9A56), const Color(0xFFFFB87A)],
-        'accent': Colors.white
+        'accent': Colors.white,
       }, // Orange
       {
         'gradient': [const Color(0xFF5F9EE8), const Color(0xFF7FB3F0)],
-        'accent': Colors.white
+        'accent': Colors.white,
       }, // Blue
       {
         'gradient': [const Color(0xFFE85F99), const Color(0xFFF07BA8)],
-        'accent': Colors.white
+        'accent': Colors.white,
       }, // Pink
     ];
 
@@ -203,37 +260,53 @@ class _GruposPageState extends ConsumerState<GruposPage> {
     final gradientColors = colorScheme['gradient'] as List<Color>;
     final accentColor = colorScheme['accent'] as Color;
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      height: 220,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: () {
-              setState(() {
-                _expandedIndex = _expandedIndex == index ? null : index;
-              });
-            },
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: gradientColors,
-                ),
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: gradientColors[0].withOpacity(0.3),
-                    blurRadius: 20,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
+    return Hero(
+      tag: 'grupo_card_$index',
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        height: 220,
+        child: TweenAnimationBuilder<double>(
+          duration: Duration(milliseconds: 300 + (index * 100)),
+          curve: Curves.easeOutBack,
+          tween: Tween(begin: 0.0, end: 1.0),
+          builder: (context, value, child) {
+            return Transform.scale(
+              scale: 0.8 + (value * 0.2),
+              child: Opacity(
+                opacity: value,
+                child: child,
               ),
-              padding: const EdgeInsets.all(24),
-              child: Column(
+            );
+          },
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () {
+                  HapticFeedback.lightImpact();
+                  setState(() {
+                    _expandedIndex = _expandedIndex == index ? null : index;
+                  });
+                },
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: gradientColors,
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: gradientColors[0].withOpacity(0.3),
+                        blurRadius: 20,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
+                  ),
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Header con badge tipo "débito/crédito"
@@ -375,6 +448,8 @@ class _GruposPageState extends ConsumerState<GruposPage> {
                   ),
                 ],
               ),
+                ),
+              ),
             ),
           ),
         ),
@@ -480,9 +555,7 @@ class _GruposPageState extends ConsumerState<GruposPage> {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: Colors.grey.shade900,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Row(
           children: [
             Icon(Icons.logout_rounded, color: Colors.red),
@@ -497,7 +570,10 @@ class _GruposPageState extends ConsumerState<GruposPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancelar', style: TextStyle(color: Colors.white70)),
+            child: const Text(
+              'Cancelar',
+              style: TextStyle(color: Colors.white70),
+            ),
           ),
           FilledButton(
             onPressed: () async {
@@ -514,5 +590,4 @@ class _GruposPageState extends ConsumerState<GruposPage> {
       ),
     );
   }
-
 }
