@@ -364,9 +364,9 @@ class GruposPage extends ConsumerWidget {
             child: const Text('Cancelar'),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.of(context).pop();
-              ref.read(profesorAuthProvider.notifier).logout();
+              await ref.read(profesorAuthProvider.notifier).logout();
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.red,

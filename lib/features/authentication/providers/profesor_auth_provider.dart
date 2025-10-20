@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../shared/models/profesor.dart';
 import '../../../shared/models/grupo.dart';
 import '../../../services/api_service.dart';
+import '../../../services/auth_storage_service.dart';
 import '../../../core/utils/utils.dart';
 
 /// Estado de la autenticación del profesor
@@ -56,11 +57,18 @@ final apiServiceProvider = Provider<ApiService>((ref) {
   return ApiService();
 });
 
+/// Provider del servicio de almacenamiento de autenticación
+final authStorageServiceProvider = Provider<AuthStorageService>((ref) {
+  return AuthStorageService();
+});
+
 /// Notifier para manejar la autenticación del profesor
 class ProfesorAuthNotifier extends StateNotifier<ProfesorAuthState> {
   final ApiService _apiService;
+  final AuthStorageService _authStorage;
 
-  ProfesorAuthNotifier(this._apiService) : super(const ProfesorAuthState());
+  ProfesorAuthNotifier(this._apiService, this._authStorage)
+    : super(const ProfesorAuthState());
 
   /// Registrar un nuevo profesor
   Future<void> register(String name, String email, String password) async {
@@ -88,6 +96,12 @@ class ProfesorAuthNotifier extends StateNotifier<ProfesorAuthState> {
         (loginResponse) async {
           Logger.info(
             'Registro exitoso para: ${loginResponse.profesor.nombreCompleto}',
+          );
+
+          // Guardar sesión en almacenamiento local
+          await _authStorage.saveSession(
+            token: loginResponse.token,
+            profesor: loginResponse.profesor,
           );
 
           state = state.copyWith(
@@ -136,6 +150,12 @@ class ProfesorAuthNotifier extends StateNotifier<ProfesorAuthState> {
             'Login exitoso para: ${loginResponse.profesor.nombreCompleto}',
           );
 
+          // Guardar sesión en almacenamiento local
+          await _authStorage.saveSession(
+            token: loginResponse.token,
+            profesor: loginResponse.profesor,
+          );
+
           state = state.copyWith(
             status: ProfesorAuthStatus.authenticated,
             profesor: loginResponse.profesor,
@@ -156,38 +176,109 @@ class ProfesorAuthNotifier extends StateNotifier<ProfesorAuthState> {
   }
 
   /// Cargar grupos del profesor autenticado
-  Future<void> _loadGrupos() async {
+  /// Si [forceRefresh] es true, ignora el cache y carga desde el servidor
+  Future<void> _loadGrupos({bool forceRefresh = false}) async {
     if (state.profesor == null || state.token == null) return;
 
     try {
-      Logger.info('Cargando clases del profesor: ${state.profesor!.id}');
+      // Primero intentar cargar desde storage local si no es refresh forzado
+      if (!forceRefresh) {
+        final cachedGrupos = _authStorage.getGrupos();
+        if (cachedGrupos != null && cachedGrupos.isNotEmpty) {
+          Logger.info(
+            '💾 ${cachedGrupos.length} clases cargadas desde cache local',
+          );
+          state = state.copyWith(grupos: cachedGrupos);
+          return; // No hacer petición HTTP
+        }
+      }
+
+      // Si no hay cache o es refresh forzado, cargar desde el servidor
+      Logger.info(
+        '🌐 Cargando clases desde el servidor: ${state.profesor!.id}',
+      );
 
       final result = await _apiService.getGruposProfesor(state.token!);
 
       result.fold(
         (error) {
           Logger.error('Error cargando clases: $error');
-          // No cambiar el estado de autenticación, solo log del error
+          // Si falla, intentar usar cache como fallback
+          final cachedGrupos = _authStorage.getGrupos();
+          if (cachedGrupos != null && cachedGrupos.isNotEmpty) {
+            Logger.info(
+              '⚠️ Usando cache como fallback: ${cachedGrupos.length} clases',
+            );
+            state = state.copyWith(grupos: cachedGrupos);
+          }
         },
-        (grupos) {
-          Logger.info('Clases cargadas exitosamente: ${grupos.length} clases');
+        (grupos) async {
+          Logger.info('✅ ${grupos.length} clases descargadas del servidor');
           state = state.copyWith(grupos: grupos);
+          // Guardar en cache para futuras sesiones
+          await _authStorage.saveGrupos(grupos);
+          Logger.info('💾 Clases guardadas en cache local');
         },
       );
     } catch (e, stackTrace) {
       Logger.error('Error inesperado cargando clases', e, stackTrace);
+      // Intentar usar cache como fallback en caso de error
+      final cachedGrupos = _authStorage.getGrupos();
+      if (cachedGrupos != null && cachedGrupos.isNotEmpty) {
+        Logger.info(
+          '⚠️ Usando cache como fallback tras error: ${cachedGrupos.length} clases',
+        );
+        state = state.copyWith(grupos: cachedGrupos);
+      }
     }
   }
 
-  /// Refrescar grupos del profesor
+  /// Refrescar grupos del profesor (fuerza descarga desde servidor)
   Future<void> refreshGrupos() async {
     if (!state.isAuthenticated) return;
-    await _loadGrupos();
+    Logger.info('🔄 Refrescando clases (forzando descarga desde servidor)');
+    await _loadGrupos(forceRefresh: true);
+  }
+
+  /// Verificar si existe una sesión almacenada y restaurarla
+  Future<void> checkStoredSession() async {
+    try {
+      Logger.info('Verificando sesión almacenada');
+
+      if (_authStorage.hasActiveSession()) {
+        final token = _authStorage.getToken();
+        final profesor = _authStorage.getProfesor();
+
+        if (token != null && profesor != null) {
+          Logger.info(
+            'Sesión válida encontrada para: ${profesor.nombreCompleto}',
+          );
+
+          state = state.copyWith(
+            status: ProfesorAuthStatus.authenticated,
+            profesor: profesor,
+            token: token,
+          );
+
+          // Cargar grupos del profesor
+          await _loadGrupos();
+        } else {
+          Logger.info('Sesión inválida o expirada');
+          await _authStorage.clearSession();
+        }
+      } else {
+        Logger.info('No hay sesión almacenada');
+      }
+    } catch (e, stackTrace) {
+      Logger.error('Error verificando sesión almacenada', e, stackTrace);
+      await _authStorage.clearSession();
+    }
   }
 
   /// Cerrar sesión
-  void logout() {
+  Future<void> logout() async {
     Logger.info('Cerrando sesión del profesor');
+    await _authStorage.clearSession();
     state = const ProfesorAuthState(status: ProfesorAuthStatus.unauthenticated);
   }
 
@@ -208,7 +299,8 @@ class ProfesorAuthNotifier extends StateNotifier<ProfesorAuthState> {
 final profesorAuthProvider =
     StateNotifierProvider<ProfesorAuthNotifier, ProfesorAuthState>((ref) {
       final apiService = ref.watch(apiServiceProvider);
-      return ProfesorAuthNotifier(apiService);
+      final authStorage = ref.watch(authStorageServiceProvider);
+      return ProfesorAuthNotifier(apiService, authStorage);
     });
 
 /// Provider para verificar si el profesor está autenticado
