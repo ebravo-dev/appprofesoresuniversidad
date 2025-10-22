@@ -3,7 +3,7 @@ class ApiConstants {
   // Base configuration
   static const String baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'https://api.uat.edu.mx',
+    defaultValue: 'https://campus.20040521.xyz',
   );
   static const int timeoutDuration = int.fromEnvironment(
     'API_TIMEOUT',

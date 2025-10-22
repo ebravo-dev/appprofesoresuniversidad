@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -6,6 +8,7 @@ import '../../../../core/theme/uat_colors.dart';
 import '../../../../shared/models/grupo.dart';
 import '../../../../shared/models/profesor.dart';
 import '../../authentication/providers/profesor_auth_provider.dart';
+import 'grupo_detail_page.dart';
 
 class GruposPage extends ConsumerStatefulWidget {
   const GruposPage({super.key});
@@ -16,10 +19,10 @@ class GruposPage extends ConsumerStatefulWidget {
 
 class _GruposPageState extends ConsumerState<GruposPage>
     with SingleTickerProviderStateMixin {
-  int? _expandedIndex;
   final ScrollController _scrollController = ScrollController();
   bool _isExpanded = false; // Control de expansión de tarjetas
   late AnimationController _pulseController;
+  int? _selectedCardIndex; // Índice de la tarjeta seleccionada para navegación
 
   // Horas de ejemplo proporcionadas por el usuario para mostrar mientras no hay horarios reales
   static const List<String> _placeholderHoras = <String>[
@@ -115,29 +118,130 @@ class _GruposPageState extends ConsumerState<GruposPage>
               letterSpacing: 0.4,
             ),
           ),
+          // Botones estilo Wallet (agrupados como iOS)
           Row(
             children: [
-              IconButton(
-                icon: Icon(
+              // Botón de expandir/colapsar
+              _buildWalletButton(
+                child: Icon(
                   _isExpanded ? Icons.unfold_less : Icons.unfold_more,
                   color: Colors.white,
-                  size: 28,
+                  size: 20,
                 ),
-                onPressed: () {
+                onTap: () {
+                  HapticFeedback.lightImpact();
                   setState(() {
                     _isExpanded = !_isExpanded;
                   });
                 },
               ),
-              IconButton(
-                icon: const Icon(
-                  Icons.more_horiz,
-                  color: Colors.white,
-                  size: 28,
+              const SizedBox(width: 8),
+              // Contenedor con tema y 3 puntos (como Wallet)
+              _buildWalletButton(
+                isWide: true,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Botón de cambiar tema
+                    GestureDetector(
+                      onTap: () {
+                        HapticFeedback.lightImpact();
+                        // TODO: Implementar cambio de tema
+                      },
+                      child: Container(
+                        width: 44,
+                        height: 44,
+                        alignment: Alignment.center,
+                        color: Colors.transparent,
+                        child: const Icon(
+                          Icons.light_mode,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                      ),
+                    ),
+                    // Botón de más opciones
+                    GestureDetector(
+                      onTap: () {
+                        HapticFeedback.lightImpact();
+                        _showOptionsMenu(context);
+                      },
+                      child: Container(
+                        width: 44,
+                        height: 44,
+                        alignment: Alignment.center,
+                        color: Colors.transparent,
+                        child: const Icon(
+                          Icons.more_horiz,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-                onPressed: () => _showOptionsMenu(context),
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWalletButton({
+    required Widget child,
+    VoidCallback? onTap,
+    bool isWide = false,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(isWide ? 22 : 22),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+          child: Container(
+            height: 44,
+            width: isWide ? null : 44,
+            decoration: BoxDecoration(
+              color: const Color(0xFF2C2C2E).withOpacity(0.72),
+              borderRadius: BorderRadius.circular(isWide ? 22 : 22),
+              border: Border.all(
+                color: Colors.white.withOpacity(0.1),
+                width: 0.5,
+              ),
+            ),
+            child: child,
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showSearchDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.grey.shade900,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.search, color: Colors.green),
+            SizedBox(width: 12),
+            Text('Buscar Clase', style: TextStyle(color: Colors.white)),
+          ],
+        ),
+        content: const Text(
+          'Esta función estará disponible próximamente.',
+          style: TextStyle(fontSize: 16, color: Colors.white70),
+        ),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(),
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.green,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Entendido'),
           ),
         ],
       ),
@@ -207,34 +311,78 @@ class _GruposPageState extends ConsumerState<GruposPage>
     const cardHeight = 200.0;
 
     // Calcular altura total del contenido
-    final totalHeight = cardHeight + (grupos.length - 1) * cardPeekHeight;
+    // Si hay una tarjeta seleccionada, agregar espacio extra para el desplazamiento
+    final baseHeight = cardHeight + (grupos.length - 1) * cardPeekHeight;
+    final extraHeight = _selectedCardIndex != null
+        ? (cardHeight - cardPeekHeight)
+        : 0.0;
+    final totalHeight = baseHeight + extraHeight;
 
     return SingleChildScrollView(
       controller: _scrollController,
       physics: const BouncingScrollPhysics(),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 400),
-          curve: Curves.easeInOut,
-          height: totalHeight,
-          child: Stack(
-            children: grupos.asMap().entries.map((entry) {
-              final index = entry.key;
-              final grupo = entry.value;
-              // TODO: Reemplazar con lógica real de horarios
-              // La última tarjeta (la que está al frente) es la clase actual
-              final isCurrentClass = index == grupos.length - 1;
-              return AnimatedPositioned(
-                duration: const Duration(milliseconds: 400),
-                curve: Curves.easeInOut,
-                top: index * cardPeekHeight,
-                left: 0,
-                right: 0,
-                child: _buildWalletCard(grupo, index, isCurrentClass),
-              );
-            }).toList(),
-          ),
+        child: Column(
+          children: [
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 350),
+              curve: Curves.fastOutSlowIn,
+              height: totalHeight,
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: grupos.asMap().entries.map((entry) {
+                  final index = entry.key;
+                  final grupo = entry.value;
+                  // TODO: Reemplazar con lógica real de horarios
+                  // La última tarjeta (la que está al frente) es la clase actual
+                  final isCurrentClass = index == grupos.length - 1;
+
+                  // Calcular posición: si hay una tarjeta seleccionada y esta está debajo,
+                  // desplazarla hacia abajo
+                  double topPosition = index * cardPeekHeight;
+                  if (_selectedCardIndex != null &&
+                      index > _selectedCardIndex!) {
+                    // Desplazar tarjetas debajo hacia abajo (altura completa de la tarjeta)
+                    topPosition += 200.0 - cardPeekHeight;
+                  }
+
+                  return AnimatedPositioned(
+                    duration: const Duration(milliseconds: 350),
+                    curve: Curves.fastOutSlowIn,
+                    top: topPosition,
+                    left: 0,
+                    right: 0,
+                    child: IgnorePointer(
+                      ignoring: false,
+                      child: _buildWalletCard(grupo, index, isCurrentClass),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+            // Indicador sutil de próxima clase por atender
+            const SizedBox(height: 12),
+            Column(
+              children: [
+                Icon(
+                  Icons.arrow_upward_rounded,
+                  size: 16,
+                  color: Colors.grey.shade600,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Próxima por atender',
+                  style: TextStyle(
+                    color: Colors.grey.shade600,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );
@@ -244,321 +392,315 @@ class _GruposPageState extends ConsumerState<GruposPage>
     // Colores inspirados en Wallet (tarjetas de crédito/débito)
     final cardColors = [
       {
-        'gradient': [const Color(0xFF6B4CE6), const Color(0xFF9B7EF5)],
+        'gradient': [const Color(0xFF8B5CF6), const Color(0xFF7C3AED)],
         'accent': Colors.white,
-      }, // Purple
+      }, // Purple vibrante
       {
-        'gradient': [const Color(0xFFFF6B6B), const Color(0xFFFF8E8E)],
+        'gradient': [const Color(0xFFFF6B9D), const Color(0xFFFF5A8F)],
         'accent': Colors.white,
-      }, // Red/Pink
+      }, // Pink coral
       {
-        'gradient': [const Color(0xFF4ECDC4), const Color(0xFF44A08D)],
+        'gradient': [const Color(0xFF2DD4BF), const Color(0xFF14B8A6)],
         'accent': Colors.white,
-      }, // Teal
+      }, // Teal brillante
       {
-        'gradient': [const Color(0xFFFF9A56), const Color(0xFFFFB87A)],
+        'gradient': [const Color(0xFFFF8A65), const Color(0xFFFF7043)],
         'accent': Colors.white,
-      }, // Orange
+      }, // Orange coral
       {
-        'gradient': [const Color(0xFF5F9EE8), const Color(0xFF7FB3F0)],
+        'gradient': [const Color(0xFF60A5FA), const Color(0xFF3B82F6)],
         'accent': Colors.white,
-      }, // Blue
+      }, // Blue brillante
       {
-        'gradient': [const Color(0xFFE85F99), const Color(0xFFF07BA8)],
+        'gradient': [const Color(0xFFFF6B9D), const Color(0xFFFF5A8F)],
         'accent': Colors.white,
-      }, // Pink
+      }, // Pink coral (repetido)
     ];
 
     final colorScheme = cardColors[index % cardColors.length];
     final gradientColors = colorScheme['gradient'] as List<Color>;
     final accentColor = colorScheme['accent'] as Color;
 
-    return Hero(
-      tag: 'grupo_card_$index',
-      child: SizedBox(
-        height: 200,
-        child: TweenAnimationBuilder<double>(
-          duration: Duration(milliseconds: 300 + (index * 100)),
-          curve: Curves.easeOut,
-          tween: Tween(begin: 0.0, end: 1.0),
-          builder: (context, value, child) {
-            // Clamp value to ensure it stays within valid range
-            final clampedValue = value.clamp(0.0, 1.0);
-            return Transform.scale(
-              scale: 0.8 + (clampedValue * 0.2),
-              child: Opacity(opacity: clampedValue, child: child),
-            );
-          },
-          child: AnimatedBuilder(
-            animation: _pulseController,
-            builder: (context, child) {
-              // Animación de pulso solo para la clase actual
-              final pulseValue = isCurrentClass
-                  ? Tween<double>(begin: 1.0, end: 1.01)
-                        .animate(
-                          CurvedAnimation(
-                            parent: _pulseController,
-                            curve: Curves.easeInOut,
-                          ),
-                        )
-                        .value
-                  : 1.0;
-
-              return Transform.scale(
-                scale: pulseValue,
-                child: Stack(
-                  children: [
-                    // Borde brillante animado para clase actual
-                    if (isCurrentClass)
-                      Container(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: [
-                            BoxShadow(
-                              color: accentColor.withOpacity(
-                                0.15 + (_pulseController.value * 0.1),
-                              ),
-                              blurRadius: 12,
-                              spreadRadius: 0,
-                            ),
-                          ],
-                        ),
-                        child: Container(
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                              color: accentColor.withOpacity(0.6),
-                              width: 2,
-                            ),
-                          ),
-                        ),
-                      ),
-                    // Tarjeta principal
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(16),
-                      child: Material(
+    return SizedBox(
+      height: 200,
+      child: TweenAnimationBuilder<double>(
+        duration: Duration(milliseconds: 300 + (index * 100)),
+        curve: Curves.easeOut,
+        tween: Tween(begin: 0.0, end: 1.0),
+        builder: (context, value, child) {
+          // Clamp value to ensure it stays within valid range
+          final clampedValue = value.clamp(0.0, 1.0);
+          return Transform.scale(
+            scale: 0.8 + (clampedValue * 0.2),
+            child: Opacity(opacity: clampedValue, child: child),
+          );
+        },
+        child: Stack(
+          children: [
+            // Tarjeta principal
+            RepaintBoundary(
+              child: Hero(
+                tag: 'grupo_${grupo.group}_${grupo.subject}',
+                flightShuttleBuilder:
+                    (
+                      BuildContext flightContext,
+                      Animation<double> animation,
+                      HeroFlightDirection flightDirection,
+                      BuildContext fromHeroContext,
+                      BuildContext toHeroContext,
+                    ) {
+                      return Material(
                         color: Colors.transparent,
-                        child: InkWell(
-                          onTap: () {
-                            HapticFeedback.lightImpact();
-                            setState(() {
-                              _expandedIndex = _expandedIndex == index
-                                  ? null
-                                  : index;
-                            });
-                          },
-                          child: Container(
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                                colors: gradientColors,
-                              ),
-                              borderRadius: BorderRadius.circular(16),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: gradientColors[0].withOpacity(
-                                    isCurrentClass ? 0.3 : 0.2,
-                                  ),
-                                  blurRadius: isCurrentClass ? 20 : 15,
-                                  offset: const Offset(0, 6),
-                                ),
-                              ],
-                            ),
-                            padding: const EdgeInsets.all(24),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                // Header con badge del grupo y hora
-                                Stack(
-                                  clipBehavior: Clip.none,
-                                  children: [
-                                    Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 12,
-                                            vertical: 6,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color: accentColor.withOpacity(0.2),
-                                            borderRadius: BorderRadius.circular(
-                                              8,
-                                            ),
-                                            border: Border.all(
-                                              color: accentColor.withOpacity(
-                                                0.3,
-                                              ),
-                                            ),
-                                          ),
-                                          child: Text(
-                                            grupo.aula,
-                                            style: TextStyle(
-                                              color: accentColor,
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.bold,
-                                              letterSpacing: 1.2,
-                                            ),
-                                          ),
-                                        ),
-                                        // TODO: Reemplazar con horario real cuando esté en el modelo
-                                        Text(
-                                          _placeholderHoras[index %
-                                              _placeholderHoras.length],
-                                          style: TextStyle(
-                                            color: accentColor.withOpacity(0.8),
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.w600,
-                                            letterSpacing: 0.5,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    // Días flotando abajo a la derecha
-                                    Positioned(
-                                      right: 0,
-                                      top: 22,
-                                      child: Text(
+                        elevation: 0,
+                        child: toHeroContext.widget,
+                      );
+                    },
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () async {
+                      HapticFeedback.lightImpact();
+
+                      // Establecer la tarjeta seleccionada y animar las demás hacia abajo
+                      setState(() {
+                        _selectedCardIndex = index;
+                      });
+
+                      // Esperar a que se complete la animación de desplazamiento
+                      await Future.delayed(const Duration(milliseconds: 300));
+
+                      // Navegar a la página de detalles
+                      await Navigator.of(context).push(
+                        PageRouteBuilder(
+                          pageBuilder:
+                              (context, animation, secondaryAnimation) =>
+                                  GrupoDetailPage(
+                                    grupo: grupo,
+                                    gradientColors: gradientColors,
+                                    accentColor: accentColor,
+                                    horario:
+                                        _placeholderHoras[index %
+                                            _placeholderHoras.length],
+                                    dias:
                                         _placeholderDias[index %
                                             _placeholderDias.length],
-                                        style: TextStyle(
-                                          color: accentColor.withOpacity(0.6),
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.w500,
-                                          letterSpacing: 0.5,
-                                        ),
+                                  ),
+                          transitionDuration: const Duration(milliseconds: 400),
+                          reverseTransitionDuration: const Duration(
+                            milliseconds: 350,
+                          ),
+                          transitionsBuilder:
+                              (context, animation, secondaryAnimation, child) {
+                                // Curva estilo iOS - suave y natural
+                                final curvedAnimation = CurvedAnimation(
+                                  parent: animation,
+                                  curve: Curves.easeOut,
+                                  reverseCurve: Curves.easeIn,
+                                );
+                                return FadeTransition(
+                                  opacity: curvedAnimation,
+                                  child: child,
+                                );
+                              },
+                        ),
+                      );
+
+                      // IMPORTANTE: Esperar a que el Hero termine de regresar
+                      // antes de restaurar las tarjetas de abajo
+                      await Future.delayed(const Duration(milliseconds: 350));
+
+                      // Al regresar, limpiar la selección para que las tarjetas vuelvan
+                      if (mounted) {
+                        setState(() {
+                          _selectedCardIndex = null;
+                        });
+                      }
+                    },
+                    borderRadius: BorderRadius.circular(16),
+                    child: Container(
+                      constraints: const BoxConstraints(minHeight: 200),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: gradientColors,
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: gradientColors[0].withOpacity(
+                              isCurrentClass ? 0.3 : 0.2,
+                            ),
+                            blurRadius: isCurrentClass ? 20 : 15,
+                            offset: const Offset(0, 6),
+                          ),
+                        ],
+                      ),
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // Header con badge del grupo y hora
+                          Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 6,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: accentColor.withOpacity(0.2),
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(
+                                        color: accentColor.withOpacity(0.3),
                                       ),
                                     ),
-                                  ],
-                                ),
-
-                                const SizedBox(height: 16),
-
-                                // Nombre de la materia (sin código entre paréntesis)
-                                Text(
-                                  grupo.materia
-                                      .replaceAll(RegExp(r'\([^)]*\)\s*'), '')
-                                      .trim(),
-                                  style: TextStyle(
-                                    color: accentColor,
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.bold,
-                                    letterSpacing: 0.5,
-                                    height: 1.2,
+                                    child: Text(
+                                      grupo.aula,
+                                      style: TextStyle(
+                                        color: accentColor,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                        letterSpacing: 1.2,
+                                      ),
+                                    ),
                                   ),
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
+                                  // TODO: Reemplazar con horario real cuando esté en el modelo
+                                  Text(
+                                    _placeholderHoras[index %
+                                        _placeholderHoras.length],
+                                    style: TextStyle(
+                                      color: accentColor.withOpacity(0.8),
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              // Días flotando abajo a la derecha
+                              Positioned(
+                                right: 0,
+                                top: 22,
+                                child: Text(
+                                  _placeholderDias[index %
+                                      _placeholderDias.length],
+                                  style: TextStyle(
+                                    color: accentColor.withOpacity(0.6),
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w500,
+                                    letterSpacing: 0.5,
+                                  ),
                                 ),
+                              ),
+                            ],
+                          ),
 
-                                const Spacer(),
+                          const SizedBox(height: 12),
 
-                                const SizedBox(height: 16),
-
-                                // Info del grupo
-                                Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          'GRUPO',
-                                          style: TextStyle(
-                                            color: accentColor.withOpacity(0.7),
-                                            fontSize: 10,
-                                            fontWeight: FontWeight.w600,
-                                            letterSpacing: 1,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          grupo.group,
-                                          style: TextStyle(
-                                            color: accentColor,
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          'PERIODO',
-                                          style: TextStyle(
-                                            color: accentColor.withOpacity(0.7),
-                                            fontSize: 10,
-                                            fontWeight: FontWeight.w600,
-                                            letterSpacing: 1,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          'P${grupo.period}',
-                                          style: TextStyle(
-                                            color: accentColor,
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.end,
-                                      children: [
-                                        Text(
-                                          'ESTUDIANTES',
-                                          style: TextStyle(
-                                            color: accentColor.withOpacity(0.7),
-                                            fontSize: 10,
-                                            fontWeight: FontWeight.w600,
-                                            letterSpacing: 1,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 2),
-                                        Row(
-                                          children: [
-                                            Icon(
-                                              Icons.people_rounded,
-                                              color: accentColor,
-                                              size: 16,
-                                            ),
-                                            const SizedBox(width: 4),
-                                            Text(
-                                              '${grupo.totalAlumnos}',
-                                              style: TextStyle(
-                                                color: accentColor,
-                                                fontSize: 16,
-                                                fontWeight: FontWeight.w600,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ],
-                                    ),
-                                  ],
+                          // Nombre de la materia con altura mínima fija para consistencia
+                          SizedBox(
+                            height: 56, // Espacio para 2 líneas
+                            child: Align(
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                grupo.materia
+                                    .replaceAll(RegExp(r'\([^)]*\)\s*'), '')
+                                    .trim(),
+                                style: TextStyle(
+                                  color: accentColor,
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 0.5,
+                                  height: 1.2,
                                 ),
-                              ],
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
                           ),
-                        ),
+
+                          const SizedBox(height: 16),
+
+                          // Info del grupo - posición fija
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'GRUPO',
+                                    style: TextStyle(
+                                      color: accentColor.withOpacity(0.7),
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w600,
+                                      letterSpacing: 1,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    grupo.group,
+                                    style: TextStyle(
+                                      color: accentColor,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  Text(
+                                    'ESTUDIANTES',
+                                    style: TextStyle(
+                                      color: accentColor.withOpacity(0.7),
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w600,
+                                      letterSpacing: 1,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        Icons.people_rounded,
+                                        color: accentColor,
+                                        size: 16,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        '${grupo.totalAlumnos}',
+                                        style: TextStyle(
+                                          color: accentColor,
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
-                    ),
-                  ],
-                ),
-              );
-            },
-          ),
-        ),
-      ),
-    );
+                    ), // Cierre Container
+                  ), // Cierre InkWell
+                ), // Cierre Material
+              ), // Cierre Hero
+            ), // Cierre RepaintBoundary
+          ],
+        ), // Cierre Stack
+      ), // Cierre TweenAnimationBuilder
+    ); // Cierre SizedBox
   }
 
   void _showOptionsMenu(BuildContext context) {

@@ -4,7 +4,7 @@ class AppConstants {
   static const String appVersion = '1.0.0';
 
   // API Configuration
-  static const String baseUrl = 'https://20040521.20040521.xyz';
+  static const String baseUrl = 'https://campus.20040521.xyz';
   static const int timeoutDuration = 30000; // 30 seconds
 
   // Database

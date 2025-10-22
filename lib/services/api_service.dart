@@ -9,7 +9,7 @@ class ApiService {
   late final Dio _dio;
   late final EncryptionService _encryptionService;
 
-  static const String baseUrl = 'https://20040521.20040521.xyz';
+  static const String baseUrl = 'https://campus.20040521.xyz';
 
   ApiService() {
     _encryptionService = EncryptionService();
