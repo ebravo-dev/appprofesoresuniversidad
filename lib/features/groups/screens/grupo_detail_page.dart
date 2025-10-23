@@ -26,10 +26,13 @@ class GrupoDetailPage extends StatefulWidget {
 }
 
 class _GrupoDetailPageState extends State<GrupoDetailPage>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   // Mapa para controlar el estado de asistencia de cada estudiante
   final Map<String, bool> _asistencias = {};
   late AnimationController _buttonAnimationController;
+  late AnimationController _studentsAnimationController;
+  late Animation<double> _studentsOpacity;
+  late Animation<Offset> _studentsSlide;
   // Eliminada Animation<double> _buttonAnimation porque no se usa
 
   @override
@@ -39,6 +42,28 @@ class _GrupoDetailPageState extends State<GrupoDetailPage>
       vsync: this,
       duration: const Duration(milliseconds: 400),
     );
+
+    // Animación para estudiantes con delay
+    _studentsAnimationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    );
+
+    _studentsOpacity = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _studentsAnimationController,
+        curve: Curves.easeOut,
+      ),
+    );
+
+    _studentsSlide =
+        Tween<Offset>(begin: const Offset(0, 0.03), end: Offset.zero).animate(
+          CurvedAnimation(
+            parent: _studentsAnimationController,
+            curve: Curves.easeOutCubic,
+          ),
+        );
+
     // Se eliminó la inicialización de _buttonAnimation porque no se usa
     // Esperar a que termine la animación del Hero
     Future.delayed(const Duration(milliseconds: 350), () {
@@ -46,11 +71,19 @@ class _GrupoDetailPageState extends State<GrupoDetailPage>
         _buttonAnimationController.forward();
       }
     });
+
+    // Delay de 400ms antes de animar estudiantes
+    Future.delayed(const Duration(milliseconds: 400), () {
+      if (mounted) {
+        _studentsAnimationController.forward();
+      }
+    });
   }
 
   @override
   void dispose() {
     _buttonAnimationController.dispose();
+    _studentsAnimationController.dispose();
     super.dispose();
   }
 
@@ -277,40 +310,52 @@ class _GrupoDetailPageState extends State<GrupoDetailPage>
                           ),
                         ),
                         const SizedBox(height: 32),
-                        // Lista de estudiantes
-                        Text(
-                          'Estudiantes',
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.9),
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        // Lista de alumnos en contenedor con estilo
-                        Container(
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF1C1C1E),
-                            borderRadius: BorderRadius.circular(12),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.2),
-                                blurRadius: 10,
-                                offset: const Offset(0, 5),
-                              ),
-                            ],
-                          ),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(12),
+                        // Lista de estudiantes con animación
+                        FadeTransition(
+                          opacity: _studentsOpacity,
+                          child: SlideTransition(
+                            position: _studentsSlide,
                             child: Column(
-                              children: List.generate(
-                                widget.grupo.students.length,
-                                (index) => _buildStudentCard(
-                                  widget.grupo.students[index],
-                                  isLast:
-                                      index == widget.grupo.students.length - 1,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Estudiantes',
+                                  style: TextStyle(
+                                    color: Colors.white.withOpacity(0.9),
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
-                              ),
+                                const SizedBox(height: 16),
+                                // Lista de alumnos en contenedor con estilo
+                                Container(
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF1C1C1E),
+                                    borderRadius: BorderRadius.circular(12),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withOpacity(0.2),
+                                        blurRadius: 10,
+                                        offset: const Offset(0, 5),
+                                      ),
+                                    ],
+                                  ),
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(12),
+                                    child: Column(
+                                      children: List.generate(
+                                        widget.grupo.students.length,
+                                        (index) => _buildStudentCard(
+                                          widget.grupo.students[index],
+                                          isLast:
+                                              index ==
+                                              widget.grupo.students.length - 1,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ),
