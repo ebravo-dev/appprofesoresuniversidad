@@ -255,6 +255,15 @@ class _GrupoDetailPageState extends State<GrupoDetailPage>
                                                   color: widget.accentColor,
                                                   size: 18,
                                                 ),
+                                                const SizedBox(width: 4),
+                                                Text(
+                                                  '${widget.grupo.totalAlumnos}',
+                                                  style: TextStyle(
+                                                    color: widget.accentColor,
+                                                    fontSize: 16,
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                ),
                                               ],
                                             ),
                                           ],
