@@ -39,7 +39,6 @@ class _GrupoDetailPageState extends State<GrupoDetailPage>
 
   // Para detectar pull-to-dismiss
   final ScrollController _scrollController = ScrollController();
-  double _dragDistance = 0;
 
   @override
   void initState() {
@@ -106,25 +105,19 @@ class _GrupoDetailPageState extends State<GrupoDetailPage>
 
             if (isAtTop && notification.metrics.pixels < 0) {
               // Hay overscroll negativo (estamos jalando hacia abajo desde el top)
-              setState(() {
-                _dragDistance = notification.metrics.pixels.abs();
-              });
+              final distance = notification.metrics.pixels.abs();
 
               // Si supera el threshold, cerrar
-              if (_dragDistance > 100) {
+              if (distance > 100) {
                 HapticFeedback.mediumImpact();
-                if (Navigator.of(context).canPop()) {
-                  Navigator.of(context).pop();
-                }
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (mounted && Navigator.of(context).canPop()) {
+                    Navigator.of(context).pop();
+                  }
+                });
                 return true; // Consumir la notificación
               }
             }
-          } else if (notification is ScrollEndNotification ||
-              notification is OverscrollNotification) {
-            // Resetear cuando termina el scroll
-            setState(() {
-              _dragDistance = 0;
-            });
           }
           return false;
         },
