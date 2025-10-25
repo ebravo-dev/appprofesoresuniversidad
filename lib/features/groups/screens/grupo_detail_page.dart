@@ -637,6 +637,42 @@ class _GrupoDetailPageState extends State<GrupoDetailPage>
   }
 
   Widget _buildAlumnosContent() {
+    return Column(
+      children: [
+        // Botón de pasar lista con Bluetooth
+        _buildPassListBTButton(),
+        const SizedBox(height: 12),
+        // Lista de alumnos
+        Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFF1C1C1E),
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.2),
+                blurRadius: 10,
+                offset: const Offset(0, 5),
+              ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Column(
+              children: List.generate(
+                widget.grupo.students.length,
+                (index) => _buildStudentCard(
+                  widget.grupo.students[index],
+                  isLast: index == widget.grupo.students.length - 1,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPassListBTButton() {
     return Container(
       decoration: BoxDecoration(
         color: const Color(0xFF1C1C1E),
@@ -649,14 +685,54 @@ class _GrupoDetailPageState extends State<GrupoDetailPage>
           ),
         ],
       ),
-      child: ClipRRect(
+      child: Material(
+        color: Colors.transparent,
         borderRadius: BorderRadius.circular(12),
-        child: Column(
-          children: List.generate(
-            widget.grupo.students.length,
-            (index) => _buildStudentCard(
-              widget.grupo.students[index],
-              isLast: index == widget.grupo.students.length - 1,
+        child: InkWell(
+          onTap: () {
+            HapticFeedback.mediumImpact();
+            // TODO: Navegar a pantalla de pasar lista con Bluetooth
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: const Text('Función de pasar lista BT en desarrollo'),
+                backgroundColor: widget.gradientColors[0],
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          },
+          borderRadius: BorderRadius.circular(12),
+          splashColor: widget.gradientColors[0].withOpacity(0.2),
+          highlightColor: widget.gradientColors[0].withOpacity(0.1),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // Texto del botón
+                const Text(
+                  'PASAR LISTA',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // Icono de Bluetooth en óvalo azul
+                Container(
+                  width: 22,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF4A90E2),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Icon(
+                    Icons.bluetooth,
+                    color: Colors.white,
+                    size: 16,
+                  ),
+                ),
+              ],
             ),
           ),
         ),
