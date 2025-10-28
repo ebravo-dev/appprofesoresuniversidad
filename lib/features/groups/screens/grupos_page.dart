@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -6,7 +7,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theme/uat_colors.dart';
 import '../../../../shared/models/grupo.dart';
-import '../../../../shared/models/profesor.dart';
 import '../../authentication/providers/profesor_auth_provider.dart';
 import 'grupo_detail_page.dart';
 
@@ -21,8 +21,10 @@ class _GruposPageState extends ConsumerState<GruposPage>
     with SingleTickerProviderStateMixin {
   final ScrollController _scrollController = ScrollController();
   bool _isExpanded = false; // Control de expansión de tarjetas
+  bool _showTitle = true; // Control de visibilidad del título
   late AnimationController _pulseController;
   int? _selectedCardIndex; // Índice de la tarjeta seleccionada para navegación
+  Timer? _titleVisibilityTimer; // Controla el retraso para esconder el título
 
   // Horas de ejemplo proporcionadas por el usuario para mostrar mientras no hay horarios reales
   static const List<String> _placeholderHoras = <String>[
@@ -44,6 +46,24 @@ class _GruposPageState extends ConsumerState<GruposPage>
     'L-M',
   ];
 
+  static const List<List<Color>> _cardGradients = [
+    [Color(0xFF8B5CF6), Color(0xFF7C3AED)],
+    [Color(0xFFFF6B9D), Color(0xFFFF5A8F)],
+    [Color(0xFF2DD4BF), Color(0xFF14B8A6)],
+    [Color(0xFFFF8A65), Color(0xFFFF7043)],
+    [Color(0xFF60A5FA), Color(0xFF3B82F6)],
+    [Color(0xFFFF6B9D), Color(0xFFFF5A8F)],
+  ];
+
+  static const List<Color> _cardAccentColors = [
+    Colors.white,
+    Colors.white,
+    Colors.white,
+    Colors.white,
+    Colors.white,
+    Colors.white,
+  ];
+
   @override
   void initState() {
     super.initState();
@@ -53,6 +73,9 @@ class _GruposPageState extends ConsumerState<GruposPage>
       vsync: this,
       duration: const Duration(milliseconds: 1500),
     )..repeat(reverse: true);
+
+    // Listener para animar el título basado en scroll
+    _scrollController.addListener(_handleScroll);
 
     // Configurar status bar para tema oscuro
     SystemChrome.setSystemUIOverlayStyle(
@@ -66,187 +89,196 @@ class _GruposPageState extends ConsumerState<GruposPage>
 
   @override
   void dispose() {
+    _titleVisibilityTimer?.cancel();
+    _scrollController.removeListener(_handleScroll);
     _scrollController.dispose();
     _pulseController.dispose();
     super.dispose();
   }
 
+  void _handleScroll() {
+    final offset = _scrollController.offset;
+
+    if (offset <= 20) {
+      _titleVisibilityTimer?.cancel();
+      _titleVisibilityTimer = null;
+      if (!_showTitle) {
+        setState(() {
+          _showTitle = true;
+        });
+      }
+      return;
+    }
+
+    if (_showTitle && _titleVisibilityTimer == null) {
+      _titleVisibilityTimer = Timer(const Duration(milliseconds: 300), () {
+        if (!mounted) return;
+        setState(() {
+          _showTitle = false;
+        });
+        _titleVisibilityTimer = null;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final profesor = ref.watch(currentProfesorProvider);
     final grupos = ref.watch(profesorGruposProvider);
     final isLoading = ref.watch(profesorAuthLoadingProvider);
 
     return Scaffold(
       backgroundColor: Colors.black,
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Header estilo Wallet
-            _buildWalletHeader(context, profesor, isLoading),
-
-            // Grupos como tarjetas apiladas
-            Expanded(
-              child: isLoading && grupos.isEmpty
-                  ? _buildLoadingState()
-                  : grupos.isEmpty
-                  ? _buildEmptyState()
-                  : _buildWalletCards(grupos),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildWalletHeader(
-    BuildContext context,
-    Profesor? profesor,
-    bool isLoading,
-  ) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      body: Stack(
         children: [
-          const Text(
-            'Mis Clases',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 34,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 0.4,
+          // Content sin padding para que ocupe toda la pantalla
+          isLoading && grupos.isEmpty
+              ? _buildLoadingState()
+              : grupos.isEmpty
+              ? _buildEmptyState()
+              : _buildWalletCards(grupos),
+          // Floating title
+          Positioned(
+            top: MediaQuery.of(context).padding.top + 8,
+            left: 16,
+            child: AnimatedOpacity(
+              opacity: _showTitle ? 1.0 : 0.0,
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeInOut,
+              child: AnimatedSlide(
+                offset: _showTitle ? Offset.zero : const Offset(0, -0.5),
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeInOut,
+                child: const Text(
+                  'Mis Clases',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 34,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.4,
+                    shadows: [
+                      Shadow(
+                        offset: Offset(0, 2),
+                        blurRadius: 8,
+                        color: Colors.black54,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ),
           ),
-          // Botones estilo Wallet (agrupados como iOS)
-          Row(
-            children: [
-              // Botón de expandir/colapsar
-              _buildWalletButton(
-                child: Icon(
-                  _isExpanded ? Icons.unfold_less : Icons.unfold_more,
-                  color: Colors.white,
-                  size: 20,
-                ),
-                onTap: () {
-                  HapticFeedback.lightImpact();
-                  setState(() {
-                    _isExpanded = !_isExpanded;
-                  });
-                },
-              ),
-              const SizedBox(width: 8),
-              // Contenedor con tema y 3 puntos (como Wallet)
-              _buildWalletButton(
-                isWide: true,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Botón de cambiar tema
-                    GestureDetector(
-                      onTap: () {
-                        HapticFeedback.lightImpact();
-                        // TODO: Implementar cambio de tema
-                      },
-                      child: Container(
-                        width: 44,
-                        height: 44,
-                        alignment: Alignment.center,
-                        color: Colors.transparent,
-                        child: const Icon(
-                          Icons.light_mode,
+          // Floating buttons
+          Positioned(
+            top: MediaQuery.of(context).padding.top + 8,
+            right: 16,
+            child: Row(
+              children: [
+                // Botón de expandir/colapsar
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(22),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                    child: Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF2C2C2E).withOpacity(0.72),
+                        borderRadius: BorderRadius.circular(22),
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.1),
+                          width: 0.5,
+                        ),
+                      ),
+                      child: IconButton(
+                        padding: EdgeInsets.zero,
+                        icon: Icon(
+                          _isExpanded ? Icons.unfold_less : Icons.unfold_more,
                           color: Colors.white,
                           size: 20,
                         ),
+                        onPressed: () {
+                          HapticFeedback.lightImpact();
+                          setState(() {
+                            _isExpanded = !_isExpanded;
+                          });
+                        },
                       ),
                     ),
-                    // Botón de más opciones
-                    GestureDetector(
-                      onTap: () {
-                        HapticFeedback.lightImpact();
-                        _showOptionsMenu(context);
-                      },
-                      child: Container(
-                        width: 44,
-                        height: 44,
-                        alignment: Alignment.center,
-                        color: Colors.transparent,
-                        child: const Icon(
-                          Icons.more_horiz,
-                          color: Colors.white,
-                          size: 20,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // Contenedor con tema y 3 puntos (como Wallet)
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(22),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                    child: Container(
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF2C2C2E).withOpacity(0.72),
+                        borderRadius: BorderRadius.circular(22),
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.1),
+                          width: 0.5,
                         ),
                       ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // Botón de cambiar tema
+                          GestureDetector(
+                            onTap: () {
+                              HapticFeedback.lightImpact();
+                              // TODO: Implementar cambio de tema
+                            },
+                            child: Container(
+                              width: 44,
+                              height: 44,
+                              alignment: Alignment.center,
+                              color: Colors.transparent,
+                              child: const Icon(
+                                Icons.light_mode,
+                                color: Colors.white,
+                                size: 20,
+                              ),
+                            ),
+                          ),
+                          // Botón de más opciones
+                          GestureDetector(
+                            onTap: () {
+                              HapticFeedback.lightImpact();
+                              _showOptionsMenu(context);
+                            },
+                            child: Container(
+                              width: 44,
+                              height: 44,
+                              alignment: Alignment.center,
+                              color: Colors.transparent,
+                              child: const Icon(
+                                Icons.more_horiz,
+                                color: Colors.white,
+                                size: 20,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildWalletButton({
-    required Widget child,
-    VoidCallback? onTap,
-    bool isWide = false,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(isWide ? 22 : 22),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-          child: Container(
-            height: 44,
-            width: isWide ? null : 44,
-            decoration: BoxDecoration(
-              color: const Color(0xFF2C2C2E).withOpacity(0.72),
-              borderRadius: BorderRadius.circular(isWide ? 22 : 22),
-              border: Border.all(
-                color: Colors.white.withOpacity(0.1),
-                width: 0.5,
-              ),
-            ),
-            child: child,
-          ),
-        ),
-      ),
-    );
-  }
+  List<Color> _gradientForCard(int index) =>
+      _cardGradients[index % _cardGradients.length];
 
-  void _showSearchDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: Colors.grey.shade900,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Row(
-          children: [
-            Icon(Icons.search, color: Colors.green),
-            SizedBox(width: 12),
-            Text('Buscar Clase', style: TextStyle(color: Colors.white)),
-          ],
-        ),
-        content: const Text(
-          'Esta función estará disponible próximamente.',
-          style: TextStyle(fontSize: 16, color: Colors.white70),
-        ),
-        actions: [
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(),
-            style: FilledButton.styleFrom(
-              backgroundColor: Colors.green,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Entendido'),
-          ),
-        ],
-      ),
-    );
-  }
+  Color _accentForCard(int index) =>
+      _cardAccentColors[index % _cardAccentColors.length];
 
   Widget _buildLoadingState() {
     return const Center(
@@ -306,8 +338,8 @@ class _GruposPageState extends ConsumerState<GruposPage>
   Widget _buildWalletCards(List<Grupo> grupos) {
     // Altura visible de cada tarjeta empalmada (como en Wallet)
     final cardPeekHeight = _isExpanded
-        ? 120.0
-        : 65.0; // Más espacio para ver los intervalos de días
+        ? 90.0
+        : 60.0; // Suficiente para mostrar horario y días, pero ocultar nombre de materia
     const cardHeight = 200.0;
 
     // Calcular altura total del contenido
@@ -320,9 +352,16 @@ class _GruposPageState extends ConsumerState<GruposPage>
 
     return SingleChildScrollView(
       controller: _scrollController,
-      physics: const BouncingScrollPhysics(),
+      physics: const AlwaysScrollableScrollPhysics(
+        parent: BouncingScrollPhysics(),
+      ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        padding: EdgeInsets.only(
+          left: 16,
+          right: 16,
+          top: MediaQuery.of(context).padding.top + 100,
+          bottom: 8,
+        ),
         child: Column(
           children: [
             AnimatedContainer(
@@ -389,37 +428,9 @@ class _GruposPageState extends ConsumerState<GruposPage>
   }
 
   Widget _buildWalletCard(Grupo grupo, int index, bool isCurrentClass) {
-    // Colores inspirados en Wallet (tarjetas de crédito/débito)
-    final cardColors = [
-      {
-        'gradient': [const Color(0xFF8B5CF6), const Color(0xFF7C3AED)],
-        'accent': Colors.white,
-      }, // Purple vibrante
-      {
-        'gradient': [const Color(0xFFFF6B9D), const Color(0xFFFF5A8F)],
-        'accent': Colors.white,
-      }, // Pink coral
-      {
-        'gradient': [const Color(0xFF2DD4BF), const Color(0xFF14B8A6)],
-        'accent': Colors.white,
-      }, // Teal brillante
-      {
-        'gradient': [const Color(0xFFFF8A65), const Color(0xFFFF7043)],
-        'accent': Colors.white,
-      }, // Orange coral
-      {
-        'gradient': [const Color(0xFF60A5FA), const Color(0xFF3B82F6)],
-        'accent': Colors.white,
-      }, // Blue brillante
-      {
-        'gradient': [const Color(0xFFFF6B9D), const Color(0xFFFF5A8F)],
-        'accent': Colors.white,
-      }, // Pink coral (repetido)
-    ];
-
-    final colorScheme = cardColors[index % cardColors.length];
-    final gradientColors = colorScheme['gradient'] as List<Color>;
-    final accentColor = colorScheme['accent'] as Color;
+    // Obtiene los colores desde la configuración compartida para mantener coherencia visual
+    final gradientColors = _gradientForCard(index);
+    final accentColor = _accentForCard(index);
 
     return SizedBox(
       height: 200,

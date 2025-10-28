@@ -43,6 +43,15 @@ class _GrupoDetailPageState extends State<GrupoDetailPage>
   @override
   void initState() {
     super.initState();
+    // Configurar status bar transparente
+    SystemChrome.setSystemUIOverlayStyle(
+      const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.light,
+        statusBarBrightness: Brightness.dark,
+      ),
+    );
+
     _buttonAnimationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 400),
@@ -123,316 +132,346 @@ class _GrupoDetailPageState extends State<GrupoDetailPage>
         },
         child: Stack(
           children: [
-            SafeArea(
-              child: CustomScrollView(
-                controller: _scrollController,
-                // AlwaysScrollableScrollPhysics asegura que siempre se pueda hacer scroll
-                // incluso cuando el contenido es pequeño, permitiendo el pull-to-dismiss
-                physics: const AlwaysScrollableScrollPhysics(
-                  parent: BouncingScrollPhysics(),
-                ),
-                slivers: [
-                  SliverAppBar(
-                    backgroundColor: Colors.transparent,
-                    toolbarHeight:
-                        60, // Ajustar altura para coincidir con el header normal
-                    leading: Padding(
-                      padding: const EdgeInsets.fromLTRB(8, 8, 0, 0),
-                      child: IconButton(
-                        padding: EdgeInsets.zero,
-                        icon: const Icon(
-                          Icons.arrow_back_ios_new,
-                          color: Colors.white,
-                          size: 20,
-                        ),
-                        onPressed: () {
-                          HapticFeedback.lightImpact();
-                          if (Navigator.of(context).canPop()) {
-                            Navigator.of(context).pop();
-                          }
-                        },
-                      ),
-                    ),
-                    actions: [
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(0, 8, 20, 0),
-                        child: _buildWalletButton(
-                          isWide: true,
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              // Botón de cambiar tema
-                              GestureDetector(
-                                onTap: () {
-                                  HapticFeedback.lightImpact();
-                                  // TODO: Implementar cambio de tema
-                                },
-                                child: Container(
-                                  width: 44,
-                                  height: 44,
-                                  alignment: Alignment.center,
-                                  color: Colors.transparent,
-                                  child: const Icon(
-                                    Icons.light_mode,
-                                    color: Colors.white,
-                                    size: 20,
-                                  ),
-                                ),
-                              ),
-                              // Botón de más opciones
-                              GestureDetector(
-                                onTap: () {
-                                  HapticFeedback.lightImpact();
-                                  _showOptionsMenu(context);
-                                },
-                                child: Container(
-                                  width: 44,
-                                  height: 44,
-                                  alignment: Alignment.center,
-                                  color: Colors.transparent,
-                                  child: const Icon(
-                                    Icons.more_horiz,
-                                    color: Colors.white,
-                                    size: 20,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
+            CustomScrollView(
+              controller: _scrollController,
+              // AlwaysScrollableScrollPhysics asegura que siempre se pueda hacer scroll
+              // incluso cuando el contenido es pequeño, permitiendo el pull-to-dismiss
+              physics: const AlwaysScrollableScrollPhysics(
+                parent: BouncingScrollPhysics(),
+              ),
+              slivers: [
+                SliverPadding(
+                  padding: EdgeInsets.only(
+                    top: MediaQuery.of(context).padding.top + 60,
                   ),
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Hero Card
-                          RepaintBoundary(
-                            child: Hero(
-                              tag:
-                                  'grupo_${widget.grupo.group}_${widget.grupo.subject}',
-                              child: Material(
-                                color: Colors.transparent,
-                                child: Container(
-                                  constraints: const BoxConstraints(
-                                    minHeight: 200,
+                ),
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Hero Card
+                        RepaintBoundary(
+                          child: Hero(
+                            tag:
+                                'grupo_${widget.grupo.group}_${widget.grupo.subject}',
+                            child: Material(
+                              color: Colors.transparent,
+                              child: Container(
+                                constraints: const BoxConstraints(
+                                  minHeight: 200,
+                                ),
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                    colors: widget.gradientColors,
                                   ),
-                                  decoration: BoxDecoration(
-                                    gradient: LinearGradient(
-                                      begin: Alignment.topLeft,
-                                      end: Alignment.bottomRight,
-                                      colors: widget.gradientColors,
+                                  borderRadius: BorderRadius.circular(16),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: widget.gradientColors[0]
+                                          .withOpacity(0.3),
+                                      blurRadius: 20,
+                                      offset: const Offset(0, 6),
                                     ),
-                                    borderRadius: BorderRadius.circular(16),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: widget.gradientColors[0]
-                                            .withOpacity(0.3),
-                                        blurRadius: 20,
-                                        offset: const Offset(0, 6),
-                                      ),
-                                    ],
-                                  ),
-                                  padding: const EdgeInsets.all(20),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      // Header con badge del grupo y hora
-                                      Stack(
-                                        clipBehavior: Clip.none,
-                                        children: [
-                                          Row(
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.spaceBetween,
-                                            children: [
-                                              Container(
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                      horizontal: 12,
-                                                      vertical: 6,
-                                                    ),
-                                                decoration: BoxDecoration(
+                                  ],
+                                ),
+                                padding: const EdgeInsets.all(20),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    // Header con badge del grupo y hora
+                                    Stack(
+                                      clipBehavior: Clip.none,
+                                      children: [
+                                        Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 12,
+                                                    vertical: 6,
+                                                  ),
+                                              decoration: BoxDecoration(
+                                                color: widget.accentColor
+                                                    .withOpacity(0.2),
+                                                borderRadius:
+                                                    BorderRadius.circular(8),
+                                                border: Border.all(
                                                   color: widget.accentColor
-                                                      .withOpacity(0.2),
-                                                  borderRadius:
-                                                      BorderRadius.circular(8),
-                                                  border: Border.all(
-                                                    color: widget.accentColor
-                                                        .withOpacity(0.3),
-                                                  ),
-                                                ),
-                                                child: Text(
-                                                  widget.grupo.aula,
-                                                  style: TextStyle(
-                                                    color: widget.accentColor,
-                                                    fontSize: 12,
-                                                    fontWeight: FontWeight.bold,
-                                                    letterSpacing: 1.2,
-                                                  ),
+                                                      .withOpacity(0.3),
                                                 ),
                                               ),
-                                              Text(
-                                                widget.horario,
+                                              child: Text(
+                                                widget.grupo.aula,
                                                 style: TextStyle(
-                                                  color: widget.accentColor
-                                                      .withOpacity(0.8),
-                                                  fontSize: 14,
-                                                  fontWeight: FontWeight.w600,
-                                                  letterSpacing: 0.5,
+                                                  color: widget.accentColor,
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.bold,
+                                                  letterSpacing: 1.2,
                                                 ),
                                               ),
-                                            ],
-                                          ),
-                                          // Días flotando abajo a la derecha
-                                          Positioned(
-                                            right: 0,
-                                            top: 22,
-                                            child: Text(
-                                              widget.dias,
+                                            ),
+                                            Text(
+                                              widget.horario,
                                               style: TextStyle(
                                                 color: widget.accentColor
-                                                    .withOpacity(0.6),
-                                                fontSize: 10,
-                                                fontWeight: FontWeight.w500,
+                                                    .withOpacity(0.8),
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w600,
                                                 letterSpacing: 0.5,
                                               ),
                                             ),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 12),
-                                      // Nombre de la materia con altura mínima fija para consistencia
-                                      SizedBox(
-                                        height: 56, // Espacio para 2 líneas
-                                        child: Align(
-                                          alignment: Alignment.centerLeft,
+                                          ],
+                                        ),
+                                        // Días flotando abajo a la derecha
+                                        Positioned(
+                                          right: 0,
+                                          top: 22,
                                           child: Text(
-                                            widget.grupo.materia
-                                                .replaceAll(
-                                                  RegExp(r'\([^)]*\)\s*'),
-                                                  '',
-                                                )
-                                                .trim(),
+                                            widget.dias,
                                             style: TextStyle(
-                                              color: widget.accentColor,
-                                              fontSize: 20,
-                                              fontWeight: FontWeight.bold,
+                                              color: widget.accentColor
+                                                  .withOpacity(0.6),
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.w500,
                                               letterSpacing: 0.5,
-                                              height: 1.2,
                                             ),
-                                            maxLines: 2,
-                                            overflow: TextOverflow.ellipsis,
                                           ),
                                         ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 12),
+                                    // Nombre de la materia con altura mínima fija para consistencia
+                                    SizedBox(
+                                      height: 56, // Espacio para 2 líneas
+                                      child: Align(
+                                        alignment: Alignment.centerLeft,
+                                        child: Text(
+                                          widget.grupo.materia
+                                              .replaceAll(
+                                                RegExp(r'\([^)]*\)\s*'),
+                                                '',
+                                              )
+                                              .trim(),
+                                          style: TextStyle(
+                                            color: widget.accentColor,
+                                            fontSize: 20,
+                                            fontWeight: FontWeight.bold,
+                                            letterSpacing: 0.5,
+                                            height: 1.2,
+                                          ),
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
                                       ),
-                                      const SizedBox(height: 16),
-                                      // Info adicional - posición fija
-                                      Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                'GRUPO',
-                                                style: TextStyle(
-                                                  color: widget.accentColor
-                                                      .withOpacity(0.7),
-                                                  fontSize: 10,
-                                                  fontWeight: FontWeight.w600,
-                                                  letterSpacing: 1,
-                                                ),
+                                    ),
+                                    const SizedBox(height: 16),
+                                    // Info adicional - posición fija
+                                    Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              'GRUPO',
+                                              style: TextStyle(
+                                                color: widget.accentColor
+                                                    .withOpacity(0.7),
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.w600,
+                                                letterSpacing: 1,
                                               ),
-                                              const SizedBox(height: 2),
-                                              Text(
-                                                widget.grupo.group,
-                                                style: TextStyle(
+                                            ),
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              widget.grupo.group,
+                                              style: TextStyle(
+                                                color: widget.accentColor,
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.end,
+                                          children: [
+                                            Text(
+                                              'ESTUDIANTES',
+                                              style: TextStyle(
+                                                color: widget.accentColor
+                                                    .withOpacity(0.7),
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.w600,
+                                                letterSpacing: 1,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 2),
+                                            Row(
+                                              children: [
+                                                Icon(
+                                                  Icons.people_rounded,
                                                   color: widget.accentColor,
-                                                  fontSize: 16,
-                                                  fontWeight: FontWeight.w600,
+                                                  size: 18,
                                                 ),
-                                              ),
-                                            ],
-                                          ),
-                                          Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.end,
-                                            children: [
-                                              Text(
-                                                'ESTUDIANTES',
-                                                style: TextStyle(
-                                                  color: widget.accentColor
-                                                      .withOpacity(0.7),
-                                                  fontSize: 10,
-                                                  fontWeight: FontWeight.w600,
-                                                  letterSpacing: 1,
-                                                ),
-                                              ),
-                                              const SizedBox(height: 2),
-                                              Row(
-                                                children: [
-                                                  Icon(
-                                                    Icons.people_rounded,
+                                                const SizedBox(width: 4),
+                                                Text(
+                                                  '${widget.grupo.totalAlumnos}',
+                                                  style: TextStyle(
                                                     color: widget.accentColor,
-                                                    size: 18,
+                                                    fontSize: 16,
+                                                    fontWeight: FontWeight.w600,
                                                   ),
-                                                  const SizedBox(width: 4),
-                                                  Text(
-                                                    '${widget.grupo.totalAlumnos}',
-                                                    style: TextStyle(
-                                                      color: widget.accentColor,
-                                                      fontSize: 16,
-                                                      fontWeight:
-                                                          FontWeight.w600,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ],
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ],
                                 ),
                               ),
                             ),
                           ),
-                          const SizedBox(height: 32),
-                          // Tab menu y contenido con animación
-                          FadeTransition(
-                            opacity: _studentsOpacity,
-                            child: SlideTransition(
-                              position: _studentsSlide,
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  // Tab Menu
-                                  _buildTabMenu(),
-                                  const SizedBox(height: 16),
-                                  // Contenido basado en el tab seleccionado
-                                  _selectedTab == 0
-                                      ? _buildMiAsistenciaContent()
-                                      : _buildAlumnosContent(),
-                                ],
-                              ),
+                        ),
+                        const SizedBox(height: 32),
+                        // Tab menu y contenido con animación
+                        FadeTransition(
+                          opacity: _studentsOpacity,
+                          child: SlideTransition(
+                            position: _studentsSlide,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Tab Menu
+                                _buildTabMenu(),
+                                const SizedBox(height: 16),
+                                // Contenido basado en el tab seleccionado
+                                _selectedTab == 0
+                                    ? _buildMiAsistenciaContent()
+                                    : _buildAlumnosContent(),
+                              ],
                             ),
                           ),
-                          const SizedBox(height: 24),
-                        ],
-                      ),
+                        ),
+                        const SizedBox(height: 24),
+                      ],
                     ),
                   ),
-                ], // Cierre de slivers
-              ), // Cierre CustomScrollView
-            ), // Cierre SafeArea
+                ),
+              ], // Cierre de slivers
+            ), // Cierre CustomScrollView
+            // Botón de back flotante
+            Positioned(
+              top: MediaQuery.of(context).padding.top + 8,
+              left: 16,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(22),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                  child: Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF2C2C2E).withOpacity(0.72),
+                      borderRadius: BorderRadius.circular(22),
+                      border: Border.all(
+                        color: Colors.white.withOpacity(0.1),
+                        width: 0.5,
+                      ),
+                    ),
+                    child: IconButton(
+                      padding: EdgeInsets.zero,
+                      icon: const Icon(
+                        Icons.arrow_back_ios_new,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                      onPressed: () {
+                        HapticFeedback.lightImpact();
+                        if (Navigator.of(context).canPop()) {
+                          Navigator.of(context).pop();
+                        }
+                      },
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            // Botones flotantes derecha
+            Positioned(
+              top: MediaQuery.of(context).padding.top + 8,
+              right: 16,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(22),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                  child: Container(
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF2C2C2E).withOpacity(0.72),
+                      borderRadius: BorderRadius.circular(22),
+                      border: Border.all(
+                        color: Colors.white.withOpacity(0.1),
+                        width: 0.5,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Botón de cambiar tema
+                        GestureDetector(
+                          onTap: () {
+                            HapticFeedback.lightImpact();
+                            // TODO: Implementar cambio de tema
+                          },
+                          child: Container(
+                            width: 44,
+                            height: 44,
+                            alignment: Alignment.center,
+                            color: Colors.transparent,
+                            child: const Icon(
+                              Icons.light_mode,
+                              color: Colors.white,
+                              size: 20,
+                            ),
+                          ),
+                        ),
+                        // Botón de más opciones
+                        GestureDetector(
+                          onTap: () {
+                            HapticFeedback.lightImpact();
+                            _showOptionsMenu(context);
+                          },
+                          child: Container(
+                            width: 44,
+                            height: 44,
+                            alignment: Alignment.center,
+                            color: Colors.transparent,
+                            child: const Icon(
+                              Icons.more_horiz,
+                              color: Colors.white,
+                              size: 20,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
           ], // Cierre Stack children
         ), // Cierre Stack
       ), // Cierre NotificationListener
