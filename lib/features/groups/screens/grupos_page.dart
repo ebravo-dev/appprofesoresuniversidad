@@ -338,8 +338,8 @@ class _GruposPageState extends ConsumerState<GruposPage>
   Widget _buildWalletCards(List<Grupo> grupos) {
     // Altura visible de cada tarjeta empalmada (como en Wallet)
     final cardPeekHeight = _isExpanded
-        ? 90.0
-        : 60.0; // Suficiente para mostrar horario y días, pero ocultar nombre de materia
+        ? 205.0 // Modo expandido: altura completa (200) + separación (5) = SIN empalme
+        : 60.0; // Modo normal: suficiente para mostrar horario y días
     const cardHeight = 200.0;
 
     // Calcular altura total del contenido
@@ -359,7 +359,7 @@ class _GruposPageState extends ConsumerState<GruposPage>
         padding: EdgeInsets.only(
           left: 16,
           right: 16,
-          top: MediaQuery.of(context).padding.top + 100,
+          top: MediaQuery.of(context).padding.top + 81,
           bottom: 8,
         ),
         child: Column(
@@ -432,8 +432,11 @@ class _GruposPageState extends ConsumerState<GruposPage>
     final gradientColors = _gradientForCard(index);
     final accentColor = _accentForCard(index);
 
-    return SizedBox(
+    return Container(
       height: 200,
+      margin: _isExpanded
+          ? const EdgeInsets.only(bottom: 5.0)
+          : EdgeInsets.zero,
       child: TweenAnimationBuilder<double>(
         duration: Duration(milliseconds: 300 + (index * 100)),
         curve: Curves.easeOut,
