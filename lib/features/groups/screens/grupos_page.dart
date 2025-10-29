@@ -136,10 +136,37 @@ class _GruposPageState extends ConsumerState<GruposPage>
               : grupos.isEmpty
               ? _buildEmptyState()
               : _buildWalletCards(grupos),
+          // Gradiente sombreado desde el status bar (efecto iOS)
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: IgnorePointer(
+              child: Container(
+                height: MediaQuery.of(context).padding.top + 120,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.black.withOpacity(0.65),
+                      Colors.black.withOpacity(0.50),
+                      Colors.black.withOpacity(0.35),
+                      Colors.black.withOpacity(0.20),
+                      Colors.black.withOpacity(0.10),
+                      Colors.black.withOpacity(0.05),
+                      Colors.transparent,
+                    ],
+                    stops: const [0.0, 0.25, 0.45, 0.60, 0.75, 0.85, 1.0],
+                  ),
+                ),
+              ),
+            ),
+          ),
           // Floating title
           Positioned(
             top: MediaQuery.of(context).padding.top + 8,
-            left: 16,
+            left: 12,
             child: AnimatedOpacity(
               opacity: _showTitle ? 1.0 : 0.0,
               duration: const Duration(milliseconds: 300),
@@ -170,7 +197,7 @@ class _GruposPageState extends ConsumerState<GruposPage>
           // Floating buttons
           Positioned(
             top: MediaQuery.of(context).padding.top + 8,
-            right: 16,
+            right: 12,
             child: Row(
               children: [
                 // Botón de expandir/colapsar
@@ -338,7 +365,7 @@ class _GruposPageState extends ConsumerState<GruposPage>
   Widget _buildWalletCards(List<Grupo> grupos) {
     // Altura visible de cada tarjeta empalmada (como en Wallet)
     final cardPeekHeight = _isExpanded
-        ? 205.0 // Modo expandido: altura completa (200) + separación (5) = SIN empalme
+        ? 180.0 // Modo expandido: mostrar hasta los valores de grupo y cantidad de estudiantes
         : 60.0; // Modo normal: suficiente para mostrar horario y días
     const cardHeight = 200.0;
 
@@ -357,8 +384,8 @@ class _GruposPageState extends ConsumerState<GruposPage>
       ),
       child: Padding(
         padding: EdgeInsets.only(
-          left: 16,
-          right: 16,
+          left: 20,
+          right: 20,
           top: MediaQuery.of(context).padding.top + 81,
           bottom: 8,
         ),

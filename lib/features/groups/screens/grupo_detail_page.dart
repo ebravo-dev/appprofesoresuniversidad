@@ -147,7 +147,10 @@ class _GrupoDetailPageState extends State<GrupoDetailPage>
                 ),
                 SliverToBoxAdapter(
                   child: Padding(
-                    padding: const EdgeInsets.all(16.0),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12.0,
+                      vertical: 16.0,
+                    ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -372,10 +375,37 @@ class _GrupoDetailPageState extends State<GrupoDetailPage>
                 ),
               ], // Cierre de slivers
             ), // Cierre CustomScrollView
+            // Gradiente sombreado desde el status bar (efecto iOS)
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: IgnorePointer(
+                child: Container(
+                  height: MediaQuery.of(context).padding.top + 120,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.black.withOpacity(0.65),
+                        Colors.black.withOpacity(0.50),
+                        Colors.black.withOpacity(0.35),
+                        Colors.black.withOpacity(0.20),
+                        Colors.black.withOpacity(0.10),
+                        Colors.black.withOpacity(0.05),
+                        Colors.transparent,
+                      ],
+                      stops: const [0.0, 0.25, 0.45, 0.60, 0.75, 0.85, 1.0],
+                    ),
+                  ),
+                ),
+              ),
+            ),
             // Botón de back flotante
             Positioned(
               top: MediaQuery.of(context).padding.top + 8,
-              left: 16,
+              left: 12,
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(22),
                 child: BackdropFilter(
@@ -394,9 +424,9 @@ class _GrupoDetailPageState extends State<GrupoDetailPage>
                     child: IconButton(
                       padding: EdgeInsets.zero,
                       icon: const Icon(
-                        Icons.arrow_back_ios_new,
+                        Icons.close,
                         color: Colors.white,
-                        size: 20,
+                        size: 24,
                       ),
                       onPressed: () {
                         HapticFeedback.lightImpact();
@@ -412,7 +442,7 @@ class _GrupoDetailPageState extends State<GrupoDetailPage>
             // Botones flotantes derecha
             Positioned(
               top: MediaQuery.of(context).padding.top + 8,
-              right: 16,
+              right: 12,
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(22),
                 child: BackdropFilter(
