@@ -121,48 +121,230 @@ class _GruposPageState extends ConsumerState<GruposPage>
     }
   }
 
+  // Parsear horario de inicio (ej: "20:00-21:00" -> 20:00)
+  DateTime? _parseHorarioInicio(String horario) {
+    try {
+      final horarioParts = horario.split('-');
+      if (horarioParts.length != 2) return null;
+
+      final inicioParts = horarioParts[0].trim().split(':');
+      if (inicioParts.length != 2) return null;
+
+      final now = DateTime.now();
+      return DateTime(
+        now.year,
+        now.month,
+        now.day,
+        int.parse(inicioParts[0]),
+        int.parse(inicioParts[1]),
+      );
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // Parsear horario fin (ej: "20:00-21:00" -> 21:00)
+  DateTime? _parseHorarioFin(String horario) {
+    try {
+      final horarioParts = horario.split('-');
+      if (horarioParts.length != 2) return null;
+
+      final finParts = horarioParts[1].trim().split(':');
+      if (finParts.length != 2) return null;
+
+      final now = DateTime.now();
+      return DateTime(
+        now.year,
+        now.month,
+        now.day,
+        int.parse(finParts[0]),
+        int.parse(finParts[1]),
+      );
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // Parsear cadena de días (ej: 'L-J', 'Ma,J') a lista de weekdays (1=Lunes..7=Domingo)
+  List<int> _parseDiasToWeekdays(String dias) {
+    final mapping = {'l': 1, 'ma': 2, 'mi': 3, 'j': 4, 'v': 5, 's': 6, 'd': 7};
+
+    final result = <int>{};
+    final parts = dias.split(',');
+    for (var part in parts) {
+      part = part.trim();
+      if (part.isEmpty) continue;
+      if (part.contains('-')) {
+        final range = part.split('-');
+        if (range.length != 2) continue;
+        final a = range[0].trim().toLowerCase();
+        final b = range[1].trim().toLowerCase();
+        final start = mapping[a] ?? mapping[a.substring(0, 1)] ?? 1;
+        final end = mapping[b] ?? mapping[b.substring(0, 1)] ?? start;
+        if (start <= end) {
+          for (var d = start; d <= end; d++) result.add(d);
+        } else {
+          // wrap around week
+          for (var d = start; d <= 7; d++) result.add(d);
+          for (var d = 1; d <= end; d++) result.add(d);
+        }
+      } else {
+        final key = part.toLowerCase();
+        final day = mapping[key] ?? mapping[key.substring(0, 1)];
+        if (day != null) result.add(day);
+      }
+    }
+    return result.toList()..sort();
+  }
+
+  // Obtener el próximo DateTime de inicio para un conjunto de weekdays y horario
+  DateTime _getNextStartForSchedule(
+    DateTime now,
+    List<int> weekdays,
+    int inicioHour,
+    int inicioMinute,
+    int finHour,
+    int finMinute,
+  ) {
+    // Buscar hasta 14 días por seguridad
+    for (var add = 0; add < 14; add++) {
+      final candidateDay = now.add(Duration(days: add));
+      if (weekdays.contains(candidateDay.weekday)) {
+        final candidateStart = DateTime(
+          candidateDay.year,
+          candidateDay.month,
+          candidateDay.day,
+          inicioHour,
+          inicioMinute,
+        );
+        final candidateEnd = DateTime(
+          candidateDay.year,
+          candidateDay.month,
+          candidateDay.day,
+          finHour,
+          finMinute,
+        );
+        final ventanaFin = candidateEnd.add(const Duration(minutes: 10));
+
+        // Si el inicio está en el futuro, lo retornamos
+        if (candidateStart.isAfter(now)) return candidateStart;
+
+        // Si estamos dentro de la ventana (inicio <= now <= ventanaFin), considerar el inicio de hoy
+        if (!now.isAfter(ventanaFin)) return candidateStart;
+        // Si ya pasó la ventana, continuar buscando la siguiente ocurrencia
+      }
+    }
+
+    // Fallback: devolver dentro de la próxima semana el primer día coincidente
+    for (var add = 1; add <= 7; add++) {
+      final candidateDay = now.add(Duration(days: add));
+      if (weekdays.contains(candidateDay.weekday)) {
+        return DateTime(
+          candidateDay.year,
+          candidateDay.month,
+          candidateDay.day,
+          inicioHour,
+          inicioMinute,
+        );
+      }
+    }
+
+    // Si no se encuentra, devolver ahora como fallback
+    return now;
+  }
+
+  // Ordenar grupos por proximidad a la próxima ocurrencia real (considerando días de la semana)
+  List<MapEntry<Grupo, int>> _sortGruposByProximity(List<Grupo> grupos) {
+    final now = DateTime.now();
+
+    // Crear lista de entradas con grupo y su índice original
+    final gruposWithIndex = grupos
+        .asMap()
+        .entries
+        .map((e) => MapEntry(e.value, e.key))
+        .toList();
+
+    gruposWithIndex.sort((a, b) {
+      final indexA = a.value;
+      final indexB = b.value;
+
+      // Obtener horarios y días usando los placeholders
+      final horarioA = _placeholderHoras[indexA % _placeholderHoras.length];
+      final diasA = _placeholderDias[indexA % _placeholderDias.length];
+      final horarioB = _placeholderHoras[indexB % _placeholderHoras.length];
+      final diasB = _placeholderDias[indexB % _placeholderDias.length];
+
+      final inicioA = _parseHorarioInicio(horarioA);
+      final finA = _parseHorarioFin(horarioA);
+      final inicioB = _parseHorarioInicio(horarioB);
+      final finB = _parseHorarioFin(horarioB);
+
+      if (inicioA == null || finA == null || inicioB == null || finB == null) {
+        return 0;
+      }
+
+      final weekdaysA = _parseDiasToWeekdays(diasA);
+      final weekdaysB = _parseDiasToWeekdays(diasB);
+
+      final nextA = _getNextStartForSchedule(
+        now,
+        weekdaysA,
+        inicioA.hour,
+        inicioA.minute,
+        finA.hour,
+        finA.minute,
+      );
+
+      final nextB = _getNextStartForSchedule(
+        now,
+        weekdaysB,
+        inicioB.hour,
+        inicioB.minute,
+        finB.hour,
+        finB.minute,
+      );
+
+      final diffA = nextA.difference(now).abs();
+      final diffB = nextB.difference(now).abs();
+
+      return diffA.compareTo(diffB);
+    });
+
+    // Revertir para que la más próxima esté al final (arriba en el stack)
+    return gruposWithIndex.reversed.toList();
+  }
+
+  Future<void> _handleRefresh() async {
+    HapticFeedback.lightImpact();
+    // Forzar reordenamiento con setState
+    setState(() {});
+    // Pequeña pausa para animación
+    await Future.delayed(const Duration(milliseconds: 300));
+  }
+
   @override
   Widget build(BuildContext context) {
     final grupos = ref.watch(profesorGruposProvider);
     final isLoading = ref.watch(profesorAuthLoadingProvider);
+
+    // Ordenar grupos por proximidad
+    final sortedGruposWithIndex = _sortGruposByProximity(grupos);
 
     return Scaffold(
       backgroundColor: Colors.black,
       body: Stack(
         children: [
           // Content sin padding para que ocupe toda la pantalla
-          isLoading && grupos.isEmpty
+          isLoading && sortedGruposWithIndex.isEmpty
               ? _buildLoadingState()
-              : grupos.isEmpty
+              : sortedGruposWithIndex.isEmpty
               ? _buildEmptyState()
-              : _buildWalletCards(grupos),
-          // Gradiente sombreado desde el status bar (efecto iOS)
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            child: IgnorePointer(
-              child: Container(
-                height: MediaQuery.of(context).padding.top + 120,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.black.withOpacity(0.65),
-                      Colors.black.withOpacity(0.50),
-                      Colors.black.withOpacity(0.35),
-                      Colors.black.withOpacity(0.20),
-                      Colors.black.withOpacity(0.10),
-                      Colors.black.withOpacity(0.05),
-                      Colors.transparent,
-                    ],
-                    stops: const [0.0, 0.25, 0.45, 0.60, 0.75, 0.85, 1.0],
-                  ),
+              : RefreshIndicator(
+                  onRefresh: _handleRefresh,
+                  color: Colors.white,
+                  backgroundColor: const Color(0xFF2C2C2E),
+                  child: _buildWalletCards(sortedGruposWithIndex),
                 ),
-              ),
-            ),
-          ),
           // Floating title
           Positioned(
             top: MediaQuery.of(context).padding.top + 8,
@@ -362,7 +544,7 @@ class _GruposPageState extends ConsumerState<GruposPage>
     );
   }
 
-  Widget _buildWalletCards(List<Grupo> grupos) {
+  Widget _buildWalletCards(List<MapEntry<Grupo, int>> gruposWithIndex) {
     // Altura visible de cada tarjeta empalmada (como en Wallet)
     final cardPeekHeight = _isExpanded
         ? 180.0 // Modo expandido: mostrar hasta los valores de grupo y cantidad de estudiantes
@@ -371,7 +553,8 @@ class _GruposPageState extends ConsumerState<GruposPage>
 
     // Calcular altura total del contenido
     // Si hay una tarjeta seleccionada, agregar espacio extra para el desplazamiento
-    final baseHeight = cardHeight + (grupos.length - 1) * cardPeekHeight;
+    final baseHeight =
+        cardHeight + (gruposWithIndex.length - 1) * cardPeekHeight;
     final extraHeight = _selectedCardIndex != null
         ? (cardHeight - cardPeekHeight)
         : 0.0;
@@ -387,7 +570,7 @@ class _GruposPageState extends ConsumerState<GruposPage>
           left: 20,
           right: 20,
           top: MediaQuery.of(context).padding.top + 81,
-          bottom: 8,
+          bottom: MediaQuery.of(context).padding.bottom + 200,
         ),
         child: Column(
           children: [
@@ -397,18 +580,21 @@ class _GruposPageState extends ConsumerState<GruposPage>
               height: totalHeight,
               child: Stack(
                 clipBehavior: Clip.none,
-                children: grupos.asMap().entries.map((entry) {
-                  final index = entry.key;
-                  final grupo = entry.value;
-                  // TODO: Reemplazar con lógica real de horarios
+                children: gruposWithIndex.asMap().entries.map((entry) {
+                  final stackIndex = entry.key; // Posición en el stack
+                  final grupoEntry = entry.value;
+                  final grupo = grupoEntry.key;
+                  final originalIndex =
+                      grupoEntry.value; // Índice original para horarios
                   // La última tarjeta (la que está al frente) es la clase actual
-                  final isCurrentClass = index == grupos.length - 1;
+                  final isCurrentClass =
+                      stackIndex == gruposWithIndex.length - 1;
 
                   // Calcular posición: si hay una tarjeta seleccionada y esta está debajo,
                   // desplazarla hacia abajo
-                  double topPosition = index * cardPeekHeight;
+                  double topPosition = stackIndex * cardPeekHeight;
                   if (_selectedCardIndex != null &&
-                      index > _selectedCardIndex!) {
+                      stackIndex > _selectedCardIndex!) {
                     // Desplazar tarjetas debajo hacia abajo (altura completa de la tarjeta)
                     topPosition += 200.0 - cardPeekHeight;
                   }
@@ -421,7 +607,12 @@ class _GruposPageState extends ConsumerState<GruposPage>
                     right: 0,
                     child: IgnorePointer(
                       ignoring: false,
-                      child: _buildWalletCard(grupo, index, isCurrentClass),
+                      child: _buildWalletCard(
+                        grupo,
+                        stackIndex,
+                        originalIndex,
+                        isCurrentClass,
+                      ),
                     ),
                   );
                 }).toList(),
@@ -454,10 +645,15 @@ class _GruposPageState extends ConsumerState<GruposPage>
     );
   }
 
-  Widget _buildWalletCard(Grupo grupo, int index, bool isCurrentClass) {
+  Widget _buildWalletCard(
+    Grupo grupo,
+    int stackIndex,
+    int originalIndex,
+    bool isCurrentClass,
+  ) {
     // Obtiene los colores desde la configuración compartida para mantener coherencia visual
-    final gradientColors = _gradientForCard(index);
-    final accentColor = _accentForCard(index);
+    final gradientColors = _gradientForCard(originalIndex);
+    final accentColor = _accentForCard(originalIndex);
 
     return Container(
       height: 200,
@@ -465,7 +661,7 @@ class _GruposPageState extends ConsumerState<GruposPage>
           ? const EdgeInsets.only(bottom: 5.0)
           : EdgeInsets.zero,
       child: TweenAnimationBuilder<double>(
-        duration: Duration(milliseconds: 300 + (index * 100)),
+        duration: Duration(milliseconds: 300 + (stackIndex * 100)),
         curve: Curves.easeOut,
         tween: Tween(begin: 0.0, end: 1.0),
         builder: (context, value, child) {
@@ -504,7 +700,7 @@ class _GruposPageState extends ConsumerState<GruposPage>
 
                       // Establecer la tarjeta seleccionada y animar las demás hacia abajo
                       setState(() {
-                        _selectedCardIndex = index;
+                        _selectedCardIndex = stackIndex;
                       });
 
                       // Esperar a que se complete la animación de desplazamiento
@@ -520,10 +716,10 @@ class _GruposPageState extends ConsumerState<GruposPage>
                                     gradientColors: gradientColors,
                                     accentColor: accentColor,
                                     horario:
-                                        _placeholderHoras[index %
+                                        _placeholderHoras[originalIndex %
                                             _placeholderHoras.length],
                                     dias:
-                                        _placeholderDias[index %
+                                        _placeholderDias[originalIndex %
                                             _placeholderDias.length],
                                   ),
                           transitionDuration: const Duration(milliseconds: 400),
@@ -614,7 +810,7 @@ class _GruposPageState extends ConsumerState<GruposPage>
                                   ),
                                   // TODO: Reemplazar con horario real cuando esté en el modelo
                                   Text(
-                                    _placeholderHoras[index %
+                                    _placeholderHoras[originalIndex %
                                         _placeholderHoras.length],
                                     style: TextStyle(
                                       color: accentColor.withOpacity(0.8),
@@ -630,7 +826,7 @@ class _GruposPageState extends ConsumerState<GruposPage>
                                 right: 0,
                                 top: 22,
                                 child: Text(
-                                  _placeholderDias[index %
+                                  _placeholderDias[originalIndex %
                                       _placeholderDias.length],
                                   style: TextStyle(
                                     color: accentColor.withOpacity(0.6),

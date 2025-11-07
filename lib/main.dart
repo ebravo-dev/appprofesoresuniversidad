@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'services/database_service.dart';
 import 'services/auth_storage_service.dart';
+import 'services/asistencia_local_service.dart';
 import 'core/constants/app_constants.dart';
 import 'core/utils/utils.dart';
 import 'core/theme/uat_theme.dart';
@@ -22,6 +24,10 @@ void main() async {
     // Initialize auth storage service
     await AuthStorageService().init();
     Logger.info('Auth storage initialized');
+
+    // Initialize asistencia local service
+    await AsistenciaLocalService().init();
+    Logger.info('Asistencia local service initialized');
 
     // Initialize database
     await DatabaseService().init();
@@ -185,6 +191,13 @@ class _MyAppState extends ConsumerState<MyApp> {
       title: AppConstants.appName,
       theme: UATTheme.lightTheme,
       routerConfig: router,
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [Locale('es', 'MX')],
+      locale: const Locale('es', 'MX'),
     );
   }
 }

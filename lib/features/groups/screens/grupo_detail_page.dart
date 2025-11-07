@@ -1,9 +1,12 @@
 import 'dart:ui';
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../shared/models/grupo.dart';
+import '../../../shared/models/asistencia_registro.dart';
+import '../../../services/asistencia_local_service.dart';
 
 class GrupoDetailPage extends StatefulWidget {
   final Grupo grupo;
@@ -35,7 +38,18 @@ class _GrupoDetailPageState extends State<GrupoDetailPage>
   late Animation<Offset> _studentsSlide;
   // Control del tab seleccionado (0 = Mi asistencia, 1 = Alumnos)
   int _selectedTab = 0;
-  bool _profesorAsistencia = false;
+  DateTime? _entradaProfesor;
+  DateTime? _salidaProfesor;
+  DateTime _selectedDateTime = DateTime.now();
+
+  // Servicio de almacenamiento local
+  final AsistenciaLocalService _asistenciaService = AsistenciaLocalService();
+
+  // Estados de sincronización: 'synced', 'pending', 'syncing'
+  String _syncStatus = 'synced';
+
+  // Timer para actualizar la hora
+  Timer? _timer;
 
   // Para detectar pull-to-dismiss
   final ScrollController _scrollController = ScrollController();
@@ -51,6 +65,18 @@ class _GrupoDetailPageState extends State<GrupoDetailPage>
         statusBarBrightness: Brightness.dark,
       ),
     );
+
+    // Cargar asistencia existente
+    _cargarAsistencia();
+
+    // Timer para actualizar la hora cada minuto
+    _timer = Timer.periodic(const Duration(minutes: 1), (timer) {
+      if (mounted) {
+        setState(() {
+          // Esto forzará la actualización del widget con la nueva hora
+        });
+      }
+    });
 
     _buttonAnimationController = AnimationController(
       vsync: this,
@@ -96,6 +122,7 @@ class _GrupoDetailPageState extends State<GrupoDetailPage>
 
   @override
   void dispose() {
+    _timer?.cancel();
     _buttonAnimationController.dispose();
     _studentsAnimationController.dispose();
     _scrollController.dispose();
@@ -375,68 +402,91 @@ class _GrupoDetailPageState extends State<GrupoDetailPage>
                 ),
               ], // Cierre de slivers
             ), // Cierre CustomScrollView
-            // Gradiente sombreado desde el status bar (efecto iOS)
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              child: IgnorePointer(
-                child: Container(
-                  height: MediaQuery.of(context).padding.top + 120,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Colors.black.withOpacity(0.65),
-                        Colors.black.withOpacity(0.50),
-                        Colors.black.withOpacity(0.35),
-                        Colors.black.withOpacity(0.20),
-                        Colors.black.withOpacity(0.10),
-                        Colors.black.withOpacity(0.05),
-                        Colors.transparent,
-                      ],
-                      stops: const [0.0, 0.25, 0.45, 0.60, 0.75, 0.85, 1.0],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            // Botón de back flotante
+            // Botones flotantes izquierda (X y fecha)
             Positioned(
               top: MediaQuery.of(context).padding.top + 8,
               left: 12,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(22),
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-                  child: Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF2C2C2E).withOpacity(0.72),
-                      borderRadius: BorderRadius.circular(22),
-                      border: Border.all(
-                        color: Colors.white.withOpacity(0.1),
-                        width: 0.5,
+              child: Row(
+                children: [
+                  // Botón X
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(22),
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                      child: Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF2C2C2E).withOpacity(0.72),
+                          borderRadius: BorderRadius.circular(22),
+                          border: Border.all(
+                            color: Colors.white.withOpacity(0.1),
+                            width: 0.5,
+                          ),
+                        ),
+                        child: IconButton(
+                          padding: EdgeInsets.zero,
+                          icon: const Icon(
+                            Icons.close,
+                            color: Colors.white,
+                            size: 24,
+                          ),
+                          onPressed: () {
+                            HapticFeedback.lightImpact();
+                            if (Navigator.of(context).canPop()) {
+                              Navigator.of(context).pop();
+                            }
+                          },
+                        ),
                       ),
-                    ),
-                    child: IconButton(
-                      padding: EdgeInsets.zero,
-                      icon: const Icon(
-                        Icons.close,
-                        color: Colors.white,
-                        size: 24,
-                      ),
-                      onPressed: () {
-                        HapticFeedback.lightImpact();
-                        if (Navigator.of(context).canPop()) {
-                          Navigator.of(context).pop();
-                        }
-                      },
                     ),
                   ),
-                ),
+                  const SizedBox(width: 8),
+                  // Botón de fecha/hora
+                  GestureDetector(
+                    onTap: () {
+                      HapticFeedback.lightImpact();
+                      _showDateTimePicker();
+                    },
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(22),
+                      child: BackdropFilter(
+                        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                        child: Container(
+                          height: 44,
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF2C2C2E).withOpacity(0.72),
+                            borderRadius: BorderRadius.circular(22),
+                            border: Border.all(
+                              color: Colors.white.withOpacity(0.1),
+                              width: 0.5,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                _getFormattedDateTime(),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              const Icon(
+                                Icons.edit,
+                                size: 16,
+                                color: Colors.white,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
             // Botones flotantes derecha
@@ -460,22 +510,29 @@ class _GrupoDetailPageState extends State<GrupoDetailPage>
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        // Botón de cambiar tema
+                        // Botón de sincronización
                         GestureDetector(
                           onTap: () {
                             HapticFeedback.lightImpact();
-                            // TODO: Implementar cambio de tema
+                            // Simular sincronización
+                            setState(() {
+                              _syncStatus = 'syncing';
+                            });
+                            Future.delayed(const Duration(seconds: 2), () {
+                              if (mounted) {
+                                setState(() {
+                                  _syncStatus = 'synced';
+                                });
+                              }
+                            });
+                            // TODO: Implementar sincronización real
                           },
                           child: Container(
                             width: 44,
                             height: 44,
                             alignment: Alignment.center,
                             color: Colors.transparent,
-                            child: const Icon(
-                              Icons.light_mode,
-                              color: Colors.white,
-                              size: 20,
-                            ),
+                            child: _buildSyncIcon(),
                           ),
                         ),
                         // Botón de más opciones
@@ -506,35 +563,6 @@ class _GrupoDetailPageState extends State<GrupoDetailPage>
         ), // Cierre Stack
       ), // Cierre NotificationListener
     ); // Cierre Scaffold
-  }
-
-  Widget _buildWalletButton({
-    required Widget child,
-    VoidCallback? onTap,
-    bool isWide = false,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(isWide ? 22 : 22),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-          child: Container(
-            height: 44,
-            width: isWide ? null : 44,
-            decoration: BoxDecoration(
-              color: const Color(0xFF2C2C2E).withOpacity(0.72),
-              borderRadius: BorderRadius.circular(isWide ? 22 : 22),
-              border: Border.all(
-                color: Colors.white.withOpacity(0.1),
-                width: 0.5,
-              ),
-            ),
-            child: child,
-          ),
-        ),
-      ),
-    );
   }
 
   Widget _buildTabMenu() {
@@ -596,113 +624,552 @@ class _GrupoDetailPageState extends State<GrupoDetailPage>
   }
 
   Widget _buildMiAsistenciaContent() {
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFF1C1C1E),
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.2),
-            blurRadius: 10,
-            offset: const Offset(0, 5),
+    return Column(
+      children: [
+        // Botón de Entrada
+        Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFF1C1C1E),
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.2),
+                blurRadius: 10,
+                offset: const Offset(0, 5),
+              ),
+            ],
           ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () {
-            HapticFeedback.mediumImpact();
-            setState(() {
-              _profesorAsistencia = !_profesorAsistencia;
-            });
-            // TODO: Guardar asistencia del profesor en backend
-          },
-          borderRadius: BorderRadius.circular(12),
-          splashColor: widget.gradientColors[0].withOpacity(0.2),
-          highlightColor: widget.gradientColors[0].withOpacity(0.1),
-          child: Padding(
-            padding: const EdgeInsets.all(24.0),
-            child: Row(
-              children: [
-                // Icono de profesor
-                Container(
-                  width: 56,
-                  height: 56,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: widget.gradientColors,
-                    ),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(
-                    Icons.person_rounded,
-                    color: Colors.white,
-                    size: 28,
-                  ),
-                ),
-                const SizedBox(width: 16),
-                // Texto
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: _entradaProfesor == null && _esFechaHoy()
+                  ? () {
+                      HapticFeedback.mediumImpact();
+                      if (_puedeMarcarEntrada()) {
+                        setState(() {
+                          _entradaProfesor = DateTime.now();
+                        });
+                        _guardarAsistencia();
+                      } else {
+                        _mostrarMensajeHorario(_getMensajeVentanaEntrada());
+                      }
+                    }
+                  : null,
+              borderRadius: BorderRadius.circular(12),
+              splashColor: widget.gradientColors[0].withOpacity(0.2),
+              highlightColor: widget.gradientColors[0].withOpacity(0.1),
+              child: Opacity(
+                opacity: _entradaProfesor == null && _esFechaHoy() ? 1.0 : 0.6,
+                child: Padding(
+                  padding: const EdgeInsets.all(20.0),
+                  child: Row(
                     children: [
-                      Text(
-                        'Registrar mi asistencia',
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.9),
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
+                      // Icono de entrada
+                      Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: widget.gradientColors[0].withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: widget.gradientColors[0].withOpacity(0.3),
+                          ),
+                        ),
+                        child: Icon(
+                          Icons.login_rounded,
+                          color: widget.gradientColors[0],
+                          size: 24,
                         ),
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        _profesorAsistencia
-                            ? '✓ Asistencia registrada'
-                            : 'Toca para marcar tu asistencia',
-                        style: TextStyle(
-                          color: _profesorAsistencia
-                              ? widget.gradientColors[0]
-                              : Colors.white.withOpacity(0.5),
-                          fontSize: 14,
-                          fontWeight: _profesorAsistencia
-                              ? FontWeight.w500
-                              : FontWeight.normal,
+                      const SizedBox(width: 16),
+                      // Texto
+                      Expanded(
+                        child: Text(
+                          _entradaProfesor == null
+                              ? 'Marcar Entrada'
+                              : 'Entrada: ${_getFormattedDate(_entradaProfesor!)} ${_formatTime(_entradaProfesor!)}',
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.9),
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
+                      // Indicador de estado
+                      if (_entradaProfesor != null)
+                        Icon(
+                          Icons.check_circle,
+                          color: widget.gradientColors[0],
+                          size: 28,
+                        ),
                     ],
                   ),
                 ),
-                const SizedBox(width: 12),
-                // Checkbox grande
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: _profesorAsistencia
-                        ? widget.gradientColors[0]
-                        : Colors.transparent,
-                    border: Border.all(
-                      color: _profesorAsistencia
-                          ? widget.gradientColors[0]
-                          : Colors.grey.shade600,
-                      width: 2.5,
-                    ),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: _profesorAsistencia
-                      ? const Icon(Icons.check, color: Colors.white, size: 24)
-                      : null,
-                ),
-              ],
+              ),
             ),
           ),
         ),
+        const SizedBox(height: 12),
+        // Botón de Salida
+        Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFF1C1C1E),
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.2),
+                blurRadius: 10,
+                offset: const Offset(0, 5),
+              ),
+            ],
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap:
+                  _entradaProfesor != null &&
+                      _salidaProfesor == null &&
+                      _esFechaHoy()
+                  ? () {
+                      HapticFeedback.mediumImpact();
+                      if (_puedeMarcarSalida()) {
+                        setState(() {
+                          _salidaProfesor = DateTime.now();
+                        });
+                        _guardarAsistencia();
+                      } else {
+                        _mostrarMensajeHorario(_getMensajeVentanaSalida());
+                      }
+                    }
+                  : null,
+              borderRadius: BorderRadius.circular(12),
+              splashColor: widget.gradientColors[0].withOpacity(0.2),
+              highlightColor: widget.gradientColors[0].withOpacity(0.1),
+              child: Opacity(
+                opacity:
+                    _entradaProfesor != null &&
+                        _salidaProfesor == null &&
+                        _esFechaHoy()
+                    ? 1.0
+                    : 0.6,
+                child: Padding(
+                  padding: const EdgeInsets.all(20.0),
+                  child: Row(
+                    children: [
+                      // Icono de salida
+                      Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: widget.gradientColors[0].withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: widget.gradientColors[0].withOpacity(0.3),
+                          ),
+                        ),
+                        child: Icon(
+                          Icons.logout_rounded,
+                          color: widget.gradientColors[0],
+                          size: 24,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      // Texto
+                      Expanded(
+                        child: Text(
+                          _salidaProfesor == null
+                              ? 'Marcar Salida'
+                              : 'Salida: ${_getFormattedDate(_salidaProfesor!)} ${_formatTime(_salidaProfesor!)}',
+                          style: TextStyle(
+                            color: _entradaProfesor == null
+                                ? Colors.white.withOpacity(0.5)
+                                : Colors.white.withOpacity(0.9),
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      // Indicador de estado
+                      if (_salidaProfesor != null)
+                        Icon(
+                          Icons.check_circle,
+                          color: widget.gradientColors[0],
+                          size: 28,
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _formatTime(DateTime dateTime) {
+    final hour = dateTime.hour.toString().padLeft(2, '0');
+    final minute = dateTime.minute.toString().padLeft(2, '0');
+    return '$hour:$minute';
+  }
+
+  // Cargar asistencia existente para la fecha seleccionada
+  void _cargarAsistencia() {
+    final registro = _asistenciaService.obtenerAsistenciaPorGrupoYFecha(
+      widget.grupo.group,
+      _selectedDateTime,
+    );
+
+    if (registro != null) {
+      setState(() {
+        _entradaProfesor = registro.horaEntrada;
+        _salidaProfesor = registro.horaSalida;
+        _asistencias.clear();
+        _asistencias.addAll(registro.asistenciasAlumnos);
+      });
+    } else {
+      setState(() {
+        _entradaProfesor = null;
+        _salidaProfesor = null;
+        _asistencias.clear();
+      });
+    }
+
+    _actualizarEstadoSincronizacion();
+  }
+
+  // Guardar asistencia localmente
+  Future<void> _guardarAsistencia() async {
+    final registroId =
+        '${widget.grupo.group}_${_selectedDateTime.year}-${_selectedDateTime.month}-${_selectedDateTime.day}';
+
+    final registro = AsistenciaRegistro(
+      id: registroId,
+      grupoId: widget.grupo.group,
+      profesorId: 'profesor_id', // TODO: Obtener del auth provider
+      fecha: _selectedDateTime,
+      horaEntrada: _entradaProfesor,
+      horaSalida: _salidaProfesor,
+      asistenciasAlumnos: Map.from(_asistencias),
+      sincronizado: false,
+      fechaCreacion: DateTime.now(),
+      fechaActualizacion: DateTime.now(),
+    );
+
+    await _asistenciaService.guardarAsistencia(registro);
+    _actualizarEstadoSincronizacion();
+  }
+
+  // Actualizar estado de sincronización
+  void _actualizarEstadoSincronizacion() {
+    final hayPendientes = _asistenciaService.hayAsistenciasPendientes();
+    setState(() {
+      _syncStatus = hayPendientes ? 'pending' : 'synced';
+    });
+  }
+
+  // Verificar si la fecha seleccionada es hoy
+  bool _esFechaHoy() {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final selected = DateTime(
+      _selectedDateTime.year,
+      _selectedDateTime.month,
+      _selectedDateTime.day,
+    );
+    return selected == today;
+  }
+
+  String _getFormattedDate(DateTime dateTime) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final yesterday = today.subtract(const Duration(days: 1));
+    final dayBeforeYesterday = today.subtract(const Duration(days: 2));
+    final targetDate = DateTime(dateTime.year, dateTime.month, dateTime.day);
+
+    if (targetDate == today) {
+      return 'Hoy';
+    } else if (targetDate == yesterday) {
+      return 'Ayer';
+    } else if (targetDate == dayBeforeYesterday) {
+      return 'Antier';
+    } else {
+      final day = dateTime.day.toString().padLeft(2, '0');
+      final months = [
+        'ene',
+        'feb',
+        'mar',
+        'abr',
+        'may',
+        'jun',
+        'jul',
+        'ago',
+        'sep',
+        'oct',
+        'nov',
+        'dic',
+      ];
+      final month = months[dateTime.month - 1];
+      return '$day-$month';
+    }
+  }
+
+  String _getFormattedDateTime() {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final yesterday = today.subtract(const Duration(days: 1));
+    final dayBeforeYesterday = today.subtract(const Duration(days: 2));
+
+    final currentDate = DateTime(
+      _selectedDateTime.year,
+      _selectedDateTime.month,
+      _selectedDateTime.day,
+    );
+    final hour = _selectedDateTime.hour.toString().padLeft(2, '0');
+    final minute = _selectedDateTime.minute.toString().padLeft(2, '0');
+    final time = '$hour:$minute';
+
+    if (currentDate == today) {
+      return 'Hoy $time';
+    } else if (currentDate == yesterday) {
+      return 'Ayer $time';
+    } else if (currentDate == dayBeforeYesterday) {
+      return 'Antier $time';
+    } else {
+      final day = _selectedDateTime.day.toString().padLeft(2, '0');
+      final months = [
+        'ene',
+        'feb',
+        'mar',
+        'abr',
+        'may',
+        'jun',
+        'jul',
+        'ago',
+        'sep',
+        'oct',
+        'nov',
+        'dic',
+      ];
+      final month = months[_selectedDateTime.month - 1];
+      return '$day-$month $time';
+    }
+  }
+
+  // Parsear el horario (ej: "20:00-21:00" -> DateTime de hoy con esas horas)
+  DateTime? _parseHorarioInicio() {
+    try {
+      final horarioParts = widget.horario.split('-');
+      if (horarioParts.length != 2) return null;
+
+      final inicioParts = horarioParts[0].trim().split(':');
+      if (inicioParts.length != 2) return null;
+
+      final now = DateTime.now();
+      return DateTime(
+        now.year,
+        now.month,
+        now.day,
+        int.parse(inicioParts[0]),
+        int.parse(inicioParts[1]),
+      );
+    } catch (e) {
+      return null;
+    }
+  }
+
+  DateTime? _parseHorarioFin() {
+    try {
+      final horarioParts = widget.horario.split('-');
+      if (horarioParts.length != 2) return null;
+
+      final finParts = horarioParts[1].trim().split(':');
+      if (finParts.length != 2) return null;
+
+      final now = DateTime.now();
+      return DateTime(
+        now.year,
+        now.month,
+        now.day,
+        int.parse(finParts[0]),
+        int.parse(finParts[1]),
+      );
+    } catch (e) {
+      return null;
+    }
+  }
+
+  bool _puedeMarcarEntrada() {
+    final inicioClase = _parseHorarioInicio();
+    if (inicioClase == null) return true; // Si no se puede parsear, permitir
+
+    final now = DateTime.now();
+    final ventanaInicio = inicioClase.subtract(const Duration(minutes: 10));
+    final ventanaFin = inicioClase.add(const Duration(minutes: 10));
+
+    return now.isAfter(ventanaInicio) && now.isBefore(ventanaFin);
+  }
+
+  bool _puedeMarcarSalida() {
+    final finClase = _parseHorarioFin();
+    if (finClase == null) return true; // Si no se puede parsear, permitir
+
+    final now = DateTime.now();
+    final ventanaInicio = finClase.subtract(const Duration(minutes: 10));
+    final ventanaFin = finClase.add(const Duration(minutes: 10));
+
+    return now.isAfter(ventanaInicio) && now.isBefore(ventanaFin);
+  }
+
+  String _getMensajeVentanaEntrada() {
+    final inicioClase = _parseHorarioInicio();
+    if (inicioClase == null) return '';
+
+    final ventanaInicio = inicioClase.subtract(const Duration(minutes: 10));
+    final ventanaFin = inicioClase.add(const Duration(minutes: 10));
+
+    final horaInicio = _formatTime(ventanaInicio);
+    final horaFin = _formatTime(ventanaFin);
+
+    return 'Puedes marcar entrada entre $horaInicio y $horaFin';
+  }
+
+  String _getMensajeVentanaSalida() {
+    final finClase = _parseHorarioFin();
+    if (finClase == null) return '';
+
+    final ventanaInicio = finClase.subtract(const Duration(minutes: 10));
+    final ventanaFin = finClase.add(const Duration(minutes: 10));
+
+    final horaInicio = _formatTime(ventanaInicio);
+    final horaFin = _formatTime(ventanaFin);
+
+    return 'Puedes marcar salida entre $horaInicio y $horaFin';
+  }
+
+  void _mostrarMensajeHorario(String mensaje) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(mensaje),
+        backgroundColor: Colors.orange[700],
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        margin: const EdgeInsets.all(16),
+        duration: const Duration(seconds: 3),
       ),
     );
+  }
+
+  Future<void> _showDateTimePicker() async {
+    // Obtener la hora actual para mantenerla cuando se cambie la fecha
+    final now = DateTime.now();
+
+    final DateTime? pickedDate = await showDatePicker(
+      context: context,
+      initialDate: _selectedDateTime,
+      firstDate: DateTime(2020),
+      lastDate: now, // No permitir fechas futuras
+      locale: const Locale('es', 'MX'),
+      builder: (context, child) {
+        return Theme(
+          data: ThemeData.dark().copyWith(
+            colorScheme: ColorScheme.dark(
+              primary: widget.accentColor,
+              onPrimary: Colors.black, // Texto negro sobre el círculo de color
+              surface: const Color(0xFF1C1C1E),
+              onSurface: Colors.white,
+            ),
+            textButtonTheme: TextButtonThemeData(
+              style: TextButton.styleFrom(
+                foregroundColor:
+                    widget.accentColor, // Color de los botones Cancel/OK
+              ),
+            ),
+            dialogTheme: DialogThemeData(
+              backgroundColor: const Color(0xFF1C1C1E),
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (pickedDate != null) {
+      // Solo actualizar la fecha, mantener la hora actual
+      setState(() {
+        _selectedDateTime = DateTime(
+          pickedDate.year,
+          pickedDate.month,
+          pickedDate.day,
+          now.hour,
+          now.minute,
+        );
+      });
+      // Cargar la asistencia de la nueva fecha seleccionada
+      _cargarAsistencia();
+    }
+  }
+
+  Widget _buildSyncIcon() {
+    switch (_syncStatus) {
+      case 'synced':
+        // Nube rellena con el color más oscuro del gradiente y check blanco
+        return Stack(
+          alignment: Alignment.center,
+          children: [
+            Icon(
+              Icons.cloud,
+              color: widget.gradientColors[1], // Color más oscuro del gradiente
+              size: 32,
+            ),
+            Icon(
+              Icons.check_rounded,
+              color: Colors.white,
+              size: 18,
+              weight: 900,
+            ),
+          ],
+        );
+      case 'pending':
+        // Nube rellena con el color más oscuro del gradiente y flecha arriba blanca
+        return Stack(
+          alignment: Alignment.center,
+          children: [
+            Icon(
+              Icons.cloud,
+              color: widget.gradientColors[1], // Color más oscuro del gradiente
+              size: 32,
+            ),
+            Icon(
+              Icons.arrow_upward_rounded,
+              color: Colors.white,
+              size: 18,
+              weight: 900,
+            ),
+          ],
+        );
+      case 'syncing':
+        return Stack(
+          alignment: Alignment.center,
+          children: [
+            Icon(
+              Icons.cloud,
+              color: widget.gradientColors[1], // Color más oscuro del gradiente
+              size: 32,
+            ),
+            const SizedBox(
+              width: 14,
+              height: 14,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+              ),
+            ),
+          ],
+        );
+      default:
+        return const Icon(Icons.cloud_off, color: Colors.grey, size: 32);
+    }
   }
 
   Widget _buildAlumnosContent() {
@@ -815,14 +1282,15 @@ class _GrupoDetailPageState extends State<GrupoDetailPage>
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: () {
+          onTap: () async {
             HapticFeedback.mediumImpact();
             setState(() {
               final currentValue =
                   _asistencias[alumno.number.toString()] ?? false;
               _asistencias[alumno.number.toString()] = !currentValue;
             });
-            // TODO: Guardar asistencia en backend
+            // Guardar en almacenamiento local
+            await _guardarAsistencia();
           },
           splashColor: widget.gradientColors[0].withOpacity(0.2),
           highlightColor: widget.gradientColors[0].withOpacity(0.1),
@@ -908,73 +1376,52 @@ class _GrupoDetailPageState extends State<GrupoDetailPage>
   void _showOptionsMenu(BuildContext context) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.transparent,
-      builder: (context) => ClipRRect(
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-          child: Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Colors.white.withOpacity(0.15),
-                  Colors.white.withOpacity(0.08),
-                ],
-              ),
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(20),
-              ),
-              border: Border.all(
-                color: Colors.white.withOpacity(0.2),
-                width: 1,
+      backgroundColor: const Color(0xFF1C1C1E),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => Container(
+        padding: const EdgeInsets.symmetric(vertical: 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[600],
+                borderRadius: BorderRadius.circular(2),
               ),
             ),
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.3),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                _buildMenuOption(
-                  icon: Icons.insights_rounded,
-                  title: 'Ver estadísticas',
-                  subtitle: 'Asistencia y reportes del grupo',
-                  onTap: () {
-                    Navigator.pop(context);
-                    // TODO: Navegar a estadísticas
-                  },
-                ),
-                _buildMenuOption(
-                  icon: Icons.share_rounded,
-                  title: 'Compartir grupo',
-                  subtitle: 'Enviar información del grupo',
-                  onTap: () {
-                    Navigator.pop(context);
-                    // TODO: Compartir grupo
-                  },
-                ),
-                _buildMenuOption(
-                  icon: Icons.settings_rounded,
-                  title: 'Configuración',
-                  subtitle: 'Ajustes del grupo y notificaciones',
-                  onTap: () {
-                    Navigator.pop(context);
-                    // TODO: Abrir configuración
-                  },
-                ),
-                const SizedBox(height: 10),
-              ],
+            const SizedBox(height: 20),
+            _buildMenuOption(
+              icon: Icons.insights_rounded,
+              title: 'Ver estadísticas',
+              subtitle: 'Asistencia y reportes del grupo',
+              onTap: () {
+                Navigator.pop(context);
+                // TODO: Navegar a estadísticas
+              },
             ),
-          ),
+            _buildMenuOption(
+              icon: Icons.share_rounded,
+              title: 'Compartir grupo',
+              subtitle: 'Enviar información del grupo',
+              onTap: () {
+                Navigator.pop(context);
+                // TODO: Compartir grupo
+              },
+            ),
+            _buildMenuOption(
+              icon: Icons.settings_rounded,
+              title: 'Configuración',
+              subtitle: 'Ajustes del grupo y notificaciones',
+              onTap: () {
+                Navigator.pop(context);
+                // TODO: Abrir configuración
+              },
+            ),
+          ],
         ),
       ),
     );
@@ -990,19 +1437,18 @@ class _GrupoDetailPageState extends State<GrupoDetailPage>
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
           child: Row(
             children: [
               Container(
-                width: 44,
-                height: 44,
+                width: 50,
+                height: 50,
                 decoration: BoxDecoration(
-                  color: widget.gradientColors[0].withOpacity(0.2),
+                  color: widget.gradientColors[0].withOpacity(0.15),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(icon, color: widget.gradientColors[0], size: 22),
+                child: Icon(icon, color: widget.gradientColors[0], size: 24),
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -1020,17 +1466,14 @@ class _GrupoDetailPageState extends State<GrupoDetailPage>
                     const SizedBox(height: 2),
                     Text(
                       subtitle,
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(0.6),
-                        fontSize: 13,
-                      ),
+                      style: TextStyle(color: Colors.grey[400], fontSize: 13),
                     ),
                   ],
                 ),
               ),
               Icon(
                 Icons.chevron_right_rounded,
-                color: Colors.white.withOpacity(0.4),
+                color: Colors.grey[600],
                 size: 20,
               ),
             ],
