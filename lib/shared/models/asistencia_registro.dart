@@ -34,6 +34,9 @@ class AsistenciaRegistro extends HiveObject {
   @HiveField(9)
   final DateTime? fechaActualizacion;
 
+  @HiveField(10)
+  final String? nombreClase; // Nombre de la materia/clase
+
   AsistenciaRegistro({
     required this.id,
     required this.grupoId,
@@ -45,6 +48,7 @@ class AsistenciaRegistro extends HiveObject {
     this.sincronizado = false,
     required this.fechaCreacion,
     this.fechaActualizacion,
+    this.nombreClase,
   });
 
   AsistenciaRegistro copyWith({
@@ -58,6 +62,7 @@ class AsistenciaRegistro extends HiveObject {
     bool? sincronizado,
     DateTime? fechaCreacion,
     DateTime? fechaActualizacion,
+    String? nombreClase,
   }) {
     return AsistenciaRegistro(
       id: id ?? this.id,
@@ -70,6 +75,7 @@ class AsistenciaRegistro extends HiveObject {
       sincronizado: sincronizado ?? this.sincronizado,
       fechaCreacion: fechaCreacion ?? this.fechaCreacion,
       fechaActualizacion: fechaActualizacion ?? this.fechaActualizacion,
+      nombreClase: nombreClase ?? this.nombreClase,
     );
   }
 }

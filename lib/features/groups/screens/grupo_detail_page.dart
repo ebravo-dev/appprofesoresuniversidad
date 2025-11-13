@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import '../../../shared/models/grupo.dart';
 import '../../../shared/models/asistencia_registro.dart';
 import '../../../services/asistencia_local_service.dart';
+import 'asistencias_pendientes_page.dart';
 
 class GrupoDetailPage extends StatefulWidget {
   final Grupo grupo;
@@ -14,6 +15,7 @@ class GrupoDetailPage extends StatefulWidget {
   final Color accentColor;
   final String horario;
   final String dias;
+  final List<Grupo>? todosLosGrupos;
 
   const GrupoDetailPage({
     super.key,
@@ -22,6 +24,7 @@ class GrupoDetailPage extends StatefulWidget {
     required this.accentColor,
     required this.horario,
     required this.dias,
+    this.todosLosGrupos,
   });
 
   @override
@@ -510,46 +513,50 @@ class _GrupoDetailPageState extends State<GrupoDetailPage>
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        // Botón de sincronización
+                        // Botón de sincronización con texto
                         GestureDetector(
                           onTap: () {
                             HapticFeedback.lightImpact();
-                            // Simular sincronización
-                            setState(() {
-                              _syncStatus = 'syncing';
-                            });
-                            Future.delayed(const Duration(seconds: 2), () {
-                              if (mounted) {
-                                setState(() {
-                                  _syncStatus = 'synced';
+
+                            // Navegar a la página de pendientes
+                            Navigator.of(context)
+                                .push(
+                                  MaterialPageRoute(
+                                    builder: (context) =>
+                                        AsistenciasPendientesPage(
+                                          claseActual: widget.grupo.subject,
+                                          grupoActualId: widget.grupo.group,
+                                          todosLosGrupos: widget.todosLosGrupos,
+                                        ),
+                                  ),
+                                )
+                                .then((_) {
+                                  // Recargar estado al regresar
+                                  _cargarAsistencia();
                                 });
-                              }
-                            });
-                            // TODO: Implementar sincronización real
                           },
                           child: Container(
-                            width: 44,
-                            height: 44,
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
                             alignment: Alignment.center,
                             color: Colors.transparent,
-                            child: _buildSyncIcon(),
-                          ),
-                        ),
-                        // Botón de más opciones
-                        GestureDetector(
-                          onTap: () {
-                            HapticFeedback.lightImpact();
-                            _showOptionsMenu(context);
-                          },
-                          child: Container(
-                            width: 44,
-                            height: 44,
-                            alignment: Alignment.center,
-                            color: Colors.transparent,
-                            child: const Icon(
-                              Icons.more_horiz,
-                              color: Colors.white,
-                              size: 20,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                _buildSyncIcon(),
+                                const SizedBox(width: 6),
+                                Text(
+                                  _syncStatus == 'pending'
+                                      ? 'Pendientes'
+                                      : _syncStatus == 'synced'
+                                      ? 'En la nube'
+                                      : '',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ),
@@ -737,6 +744,7 @@ class _GrupoDetailPageState extends State<GrupoDetailPage>
                           _salidaProfesor = DateTime.now();
                         });
                         _guardarAsistencia();
+                        _intentarSincronizarAsistencia();
                       } else {
                         _mostrarMensajeHorario(_getMensajeVentanaSalida());
                       }
@@ -827,6 +835,14 @@ class _GrupoDetailPageState extends State<GrupoDetailPage>
         _asistencias.clear();
         _asistencias.addAll(registro.asistenciasAlumnos);
       });
+
+      // Actualizar el nombre de la clase si está vacío (asistencias antiguas)
+      if (registro.nombreClase == null || registro.nombreClase!.isEmpty) {
+        final registroActualizado = registro.copyWith(
+          nombreClase: widget.grupo.subject,
+        );
+        _asistenciaService.guardarAsistencia(registroActualizado);
+      }
     } else {
       setState(() {
         _entradaProfesor = null;
@@ -854,10 +870,291 @@ class _GrupoDetailPageState extends State<GrupoDetailPage>
       sincronizado: false,
       fechaCreacion: DateTime.now(),
       fechaActualizacion: DateTime.now(),
+      nombreClase: widget.grupo.subject,
     );
 
     await _asistenciaService.guardarAsistencia(registro);
     _actualizarEstadoSincronizacion();
+  }
+
+  // Intentar sincronizar asistencia a la nube
+  Future<void> _intentarSincronizarAsistencia() async {
+    // Mostrar diálogo de progreso
+    if (!mounted) return;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return Dialog(
+          backgroundColor: const Color(0xFF2C2C2E),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Icono de nube
+                Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Icon(
+                      Icons.cloud,
+                      color: widget.gradientColors[1],
+                      size: 60,
+                    ),
+                    Icon(
+                      Icons.arrow_upward_rounded,
+                      color: Colors.white,
+                      size: 28,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                // Indicador de progreso
+                SizedBox(
+                  width: 40,
+                  height: 40,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 3,
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      widget.gradientColors[1],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  'Subiendo asistencia',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Estamos guardando la asistencia\nen la nube...',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.white70, fontSize: 14),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    // Simular intento de sincronización
+    // TODO: Implementar llamada real al API
+    await Future.delayed(const Duration(seconds: 2));
+
+    // Cerrar diálogo
+    if (mounted) {
+      Navigator.of(context).pop();
+    }
+
+    // Simular éxito/fallo aleatorio para pruebas
+    // TODO: Reemplazar con lógica real de sincronización
+    final exito = DateTime.now().second % 2 == 0; // Simulación temporal
+
+    if (exito) {
+      // Éxito: actualizar estado y mostrar confirmación
+      setState(() {
+        _syncStatus = 'synced';
+      });
+
+      if (mounted) {
+        _mostrarDialogoExito();
+      }
+    } else {
+      // Error: mantener como pendiente y mostrar mensaje
+      setState(() {
+        _syncStatus = 'pending';
+      });
+
+      if (mounted) {
+        _mostrarDialogoErrorSincronizacion();
+      }
+    }
+  }
+
+  // Mostrar diálogo de éxito
+  void _mostrarDialogoExito() {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (BuildContext context) {
+        return Dialog(
+          backgroundColor: const Color(0xFF2C2C2E),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Icono de éxito
+                Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    color: Colors.green.withOpacity(0.2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.check_circle,
+                    color: Colors.green,
+                    size: 50,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  '¡Asistencia guardada!',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'La asistencia del profesor y los alumnos\nha sido subida exitosamente a la nube.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.white70, fontSize: 14),
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text(
+                      'Entendido',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    // Auto cerrar después de 2 segundos
+    Future.delayed(const Duration(seconds: 2), () {
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+    });
+  }
+
+  // Mostrar diálogo de error de sincronización
+  void _mostrarDialogoErrorSincronizacion() {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (BuildContext context) {
+        return Dialog(
+          backgroundColor: const Color(0xFF2C2C2E),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Icono de advertencia
+                Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withOpacity(0.2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(Icons.cloud_off, color: Colors.orange, size: 50),
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  'No se pudo subir',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'La asistencia fue guardada localmente\npero no se pudo subir a la nube.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.white70, fontSize: 14),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.info_outline, color: Colors.orange, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Puede intentarlo más tarde usando el botón "Pendientes" en la esquina superior derecha.',
+                          style: TextStyle(
+                            color: Colors.orange.shade300,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.orange,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text(
+                      'Entendido',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   // Actualizar estado de sincronización

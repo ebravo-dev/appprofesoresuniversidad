@@ -26,26 +26,6 @@ class _GruposPageState extends ConsumerState<GruposPage>
   int? _selectedCardIndex; // Índice de la tarjeta seleccionada para navegación
   Timer? _titleVisibilityTimer; // Controla el retraso para esconder el título
 
-  // Horas de ejemplo proporcionadas por el usuario para mostrar mientras no hay horarios reales
-  static const List<String> _placeholderHoras = <String>[
-    '10:00-11:00',
-    '13:00-14:00',
-    '16:00-17:00',
-    '19:00-20:00',
-    '20:00-21:00',
-    '20:00-21:00',
-    '20:00-21:00',
-  ];
-
-  // Días de la semana para cada clase
-  static const List<String> _placeholderDias = <String>[
-    'L-J',
-    'L-V',
-    'Ma,J',
-    'Mi-V',
-    'L-M',
-  ];
-
   static const List<List<Color>> _cardGradients = [
     [Color(0xFF8B5CF6), Color(0xFF7C3AED)],
     [Color(0xFFFF6B9D), Color(0xFFFF5A8F)],
@@ -265,14 +245,14 @@ class _GruposPageState extends ConsumerState<GruposPage>
         .toList();
 
     gruposWithIndex.sort((a, b) {
-      final indexA = a.value;
-      final indexB = b.value;
+      final grupoA = a.key;
+      final grupoB = b.key;
 
-      // Obtener horarios y días usando los placeholders
-      final horarioA = _placeholderHoras[indexA % _placeholderHoras.length];
-      final diasA = _placeholderDias[indexA % _placeholderDias.length];
-      final horarioB = _placeholderHoras[indexB % _placeholderHoras.length];
-      final diasB = _placeholderDias[indexB % _placeholderDias.length];
+      // Obtener horarios y días desde el schedule real del grupo
+      final horarioA = grupoA.horario ?? '00:00-00:00';
+      final horarioB = grupoB.horario ?? '00:00-00:00';
+      final weekdaysA = grupoA.weekdaysConClase;
+      final weekdaysB = grupoB.weekdaysConClase;
 
       final inicioA = _parseHorarioInicio(horarioA);
       final finA = _parseHorarioFin(horarioA);
@@ -283,8 +263,9 @@ class _GruposPageState extends ConsumerState<GruposPage>
         return 0;
       }
 
-      final weekdaysA = _parseDiasToWeekdays(diasA);
-      final weekdaysB = _parseDiasToWeekdays(diasB);
+      if (weekdaysA.isEmpty || weekdaysB.isEmpty) {
+        return 0;
+      }
 
       final nextA = _getNextStartForSchedule(
         now,
@@ -343,7 +324,7 @@ class _GruposPageState extends ConsumerState<GruposPage>
                   onRefresh: _handleRefresh,
                   color: Colors.white,
                   backgroundColor: const Color(0xFF2C2C2E),
-                  child: _buildWalletCards(sortedGruposWithIndex),
+                  child: _buildWalletCards(sortedGruposWithIndex, grupos),
                 ),
           // Floating title
           Positioned(
@@ -544,7 +525,7 @@ class _GruposPageState extends ConsumerState<GruposPage>
     );
   }
 
-  Widget _buildWalletCards(List<MapEntry<Grupo, int>> gruposWithIndex) {
+  Widget _buildWalletCards(List<MapEntry<Grupo, int>> gruposWithIndex, List<Grupo> todosLosGrupos) {
     // Altura visible de cada tarjeta empalmada (como en Wallet)
     final cardPeekHeight = _isExpanded
         ? 180.0 // Modo expandido: mostrar hasta los valores de grupo y cantidad de estudiantes
@@ -612,6 +593,7 @@ class _GruposPageState extends ConsumerState<GruposPage>
                         stackIndex,
                         originalIndex,
                         isCurrentClass,
+                        todosLosGrupos,
                       ),
                     ),
                   );
@@ -650,6 +632,7 @@ class _GruposPageState extends ConsumerState<GruposPage>
     int stackIndex,
     int originalIndex,
     bool isCurrentClass,
+    List<Grupo> todosLosGrupos,
   ) {
     // Obtiene los colores desde la configuración compartida para mantener coherencia visual
     final gradientColors = _gradientForCard(originalIndex);
@@ -715,12 +698,9 @@ class _GruposPageState extends ConsumerState<GruposPage>
                                     grupo: grupo,
                                     gradientColors: gradientColors,
                                     accentColor: accentColor,
-                                    horario:
-                                        _placeholderHoras[originalIndex %
-                                            _placeholderHoras.length],
-                                    dias:
-                                        _placeholderDias[originalIndex %
-                                            _placeholderDias.length],
+                                    horario: grupo.horario ?? '00:00-00:00',
+                                    dias: grupo.diasClase ?? 'N/A',
+                                    todosLosGrupos: todosLosGrupos,
                                   ),
                           transitionDuration: const Duration(milliseconds: 400),
                           reverseTransitionDuration: const Duration(
@@ -808,10 +788,9 @@ class _GruposPageState extends ConsumerState<GruposPage>
                                       ),
                                     ),
                                   ),
-                                  // TODO: Reemplazar con horario real cuando esté en el modelo
+                                  // Horario real desde el schedule
                                   Text(
-                                    _placeholderHoras[originalIndex %
-                                        _placeholderHoras.length],
+                                    grupo.horario ?? 'Sin horario',
                                     style: TextStyle(
                                       color: accentColor.withOpacity(0.8),
                                       fontSize: 14,
@@ -826,8 +805,7 @@ class _GruposPageState extends ConsumerState<GruposPage>
                                 right: 0,
                                 top: 22,
                                 child: Text(
-                                  _placeholderDias[originalIndex %
-                                      _placeholderDias.length],
+                                  grupo.diasClase ?? 'N/A',
                                   style: TextStyle(
                                     color: accentColor.withOpacity(0.6),
                                     fontSize: 10,

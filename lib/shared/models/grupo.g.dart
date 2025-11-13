@@ -14,6 +14,9 @@ Grupo _$GrupoFromJson(Map<String, dynamic> json) => Grupo(
       students: (json['students'] as List<dynamic>)
           .map((e) => Alumno.fromJson(e as Map<String, dynamic>))
           .toList(),
+      schedule: (json['schedule'] as Map<String, dynamic>?)?.map(
+        (k, e) => MapEntry(k, e as String?),
+      ),
     );
 
 Map<String, dynamic> _$GrupoToJson(Grupo instance) => <String, dynamic>{
@@ -22,4 +25,5 @@ Map<String, dynamic> _$GrupoToJson(Grupo instance) => <String, dynamic>{
       'subject': instance.subject,
       'period': instance.period,
       'students': instance.students,
+      'schedule': instance.schedule,
     };

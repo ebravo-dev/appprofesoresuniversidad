@@ -27,13 +27,14 @@ class AsistenciaRegistroAdapter extends TypeAdapter<AsistenciaRegistro> {
       sincronizado: fields[7] as bool,
       fechaCreacion: fields[8] as DateTime,
       fechaActualizacion: fields[9] as DateTime?,
+      nombreClase: fields[10] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, AsistenciaRegistro obj) {
     writer
-      ..writeByte(10)
+      ..writeByte(11)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -53,7 +54,9 @@ class AsistenciaRegistroAdapter extends TypeAdapter<AsistenciaRegistro> {
       ..writeByte(8)
       ..write(obj.fechaCreacion)
       ..writeByte(9)
-      ..write(obj.fechaActualizacion);
+      ..write(obj.fechaActualizacion)
+      ..writeByte(10)
+      ..write(obj.nombreClase);
   }
 
   @override

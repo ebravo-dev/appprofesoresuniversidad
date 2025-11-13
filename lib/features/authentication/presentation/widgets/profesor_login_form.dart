@@ -351,25 +351,30 @@ class _ProfesorLoginFormState extends ConsumerState<ProfesorLoginForm> {
                   elevation: 2,
                   disabledBackgroundColor: UATColors.neutral40,
                   disabledForegroundColor: UATColors.neutral80,
+                  textStyle: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-                child: authState.isLoading
-                    ? SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            UATColors.onPrimary,
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 200),
+                  child: authState.isLoading
+                      ? SizedBox(
+                          key: const ValueKey('loading'),
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              UATColors.onPrimary,
+                            ),
                           ),
+                        )
+                      : Text(
+                          _isLoginMode ? 'Iniciar Sesión' : 'Registrarse',
+                          key: ValueKey(_isLoginMode ? 'login' : 'register'),
                         ),
-                      )
-                    : Text(
-                        _isLoginMode ? 'Iniciar Sesión' : 'Registrarse',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
+                ),
               ),
             ),
 
