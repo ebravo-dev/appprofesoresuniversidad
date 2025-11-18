@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theme/uat_colors.dart';
 import '../../../../shared/models/grupo.dart';
+import '../../../../services/asistencia_local_service.dart';
 import '../../authentication/providers/profesor_auth_provider.dart';
 import 'grupo_detail_page.dart';
 
@@ -525,7 +526,10 @@ class _GruposPageState extends ConsumerState<GruposPage>
     );
   }
 
-  Widget _buildWalletCards(List<MapEntry<Grupo, int>> gruposWithIndex, List<Grupo> todosLosGrupos) {
+  Widget _buildWalletCards(
+    List<MapEntry<Grupo, int>> gruposWithIndex,
+    List<Grupo> todosLosGrupos,
+  ) {
     // Altura visible de cada tarjeta empalmada (como en Wallet)
     final cardPeekHeight = _isExpanded
         ? 180.0 // Modo expandido: mostrar hasta los valores de grupo y cantidad de estudiantes
@@ -980,6 +984,21 @@ class _GruposPageState extends ConsumerState<GruposPage>
 
               // Opciones
               ListTile(
+                leading: const Icon(Icons.delete_sweep, color: Colors.orange),
+                title: const Text(
+                  'Borrar Caché de Asistencias',
+                  style: TextStyle(color: Colors.white),
+                ),
+                subtitle: Text(
+                  'Eliminar asistencias guardadas localmente',
+                  style: TextStyle(color: Colors.grey.shade400, fontSize: 12),
+                ),
+                onTap: () {
+                  Navigator.pop(context);
+                  _showClearCacheDialog(context);
+                },
+              ),
+              ListTile(
                 leading: const Icon(Icons.logout, color: Colors.red),
                 title: const Text(
                   'Cerrar Sesión',
@@ -1038,5 +1057,75 @@ class _GruposPageState extends ConsumerState<GruposPage>
         ],
       ),
     );
+  }
+
+  void _showClearCacheDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.grey.shade900,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.delete_sweep, color: Colors.orange),
+            SizedBox(width: 12),
+            Text('Borrar Caché', style: TextStyle(color: Colors.white)),
+          ],
+        ),
+        content: const Text(
+          '¿Estás seguro de que quieres eliminar todas las asistencias guardadas localmente?\n\nEsto solo afecta las asistencias no sincronizadas.',
+          style: TextStyle(fontSize: 16, color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text(
+              'Cancelar',
+              style: TextStyle(color: Colors.white70),
+            ),
+          ),
+          FilledButton(
+            onPressed: () async {
+              Navigator.of(context).pop();
+              await _clearAsistenciasCache();
+            },
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.orange,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Borrar Caché'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _clearAsistenciasCache() async {
+    try {
+      final asistenciaService = AsistenciaLocalService();
+      await asistenciaService.limpiarTodo();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Caché de asistencias eliminado correctamente'),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al limpiar caché: $e'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    }
   }
 }

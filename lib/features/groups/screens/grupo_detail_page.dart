@@ -57,6 +57,9 @@ class _GrupoDetailPageState extends State<GrupoDetailPage>
   // Para detectar pull-to-dismiss
   final ScrollController _scrollController = ScrollController();
 
+  // Control del botón flotante para volver arriba
+  bool _showScrollToTopButton = false;
+
   @override
   void initState() {
     super.initState();
@@ -71,6 +74,9 @@ class _GrupoDetailPageState extends State<GrupoDetailPage>
 
     // Cargar asistencia existente
     _cargarAsistencia();
+
+    // Listener para detectar scroll y mostrar/ocultar botón flotante
+    _scrollController.addListener(_scrollListener);
 
     // Timer para actualizar la hora cada minuto
     _timer = Timer.periodic(const Duration(minutes: 1), (timer) {
@@ -123,9 +129,31 @@ class _GrupoDetailPageState extends State<GrupoDetailPage>
     });
   }
 
+  void _scrollListener() {
+    if (_scrollController.hasClients) {
+      // Mostrar botón si scrolleamos más de 200 píxeles
+      final shouldShow = _scrollController.offset > 200;
+      if (shouldShow != _showScrollToTopButton) {
+        setState(() {
+          _showScrollToTopButton = shouldShow;
+        });
+      }
+    }
+  }
+
+  void _scrollToTop() {
+    HapticFeedback.mediumImpact();
+    _scrollController.animateTo(
+      0,
+      duration: const Duration(milliseconds: 500),
+      curve: Curves.easeOutCubic,
+    );
+  }
+
   @override
   void dispose() {
     _timer?.cancel();
+    _scrollController.removeListener(_scrollListener);
     _buttonAnimationController.dispose();
     _studentsAnimationController.dispose();
     _scrollController.dispose();
@@ -525,7 +553,8 @@ class _GrupoDetailPageState extends State<GrupoDetailPage>
                                     builder: (context) =>
                                         AsistenciasPendientesPage(
                                           claseActual: widget.grupo.subject,
-                                          grupoActualId: widget.grupo.group,
+                                          grupoActualId:
+                                              widget.grupo.identificadorUnico,
                                           todosLosGrupos: widget.todosLosGrupos,
                                         ),
                                   ),
@@ -552,7 +581,7 @@ class _GrupoDetailPageState extends State<GrupoDetailPage>
                                       : '',
                                   style: const TextStyle(
                                     color: Colors.white,
-                                    fontSize: 12,
+                                    fontSize: 13,
                                     fontWeight: FontWeight.w500,
                                   ),
                                 ),
@@ -566,6 +595,62 @@ class _GrupoDetailPageState extends State<GrupoDetailPage>
                 ),
               ),
             ),
+            // Botón flotante para volver arriba
+            if (_showScrollToTopButton)
+              Positioned(
+                bottom: 24,
+                right: 16,
+                child: TweenAnimationBuilder<double>(
+                  duration: const Duration(milliseconds: 200),
+                  tween: Tween<double>(begin: 0, end: 1),
+                  builder: (context, value, child) {
+                    return Transform.scale(
+                      scale: value,
+                      child: Opacity(opacity: value, child: child),
+                    );
+                  },
+                  child: GestureDetector(
+                    onTap: _scrollToTop,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(22),
+                      child: BackdropFilter(
+                        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                        child: Container(
+                          height: 44,
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF2C2C2E).withOpacity(0.72),
+                            borderRadius: BorderRadius.circular(22),
+                            border: Border.all(
+                              color: Colors.white.withOpacity(0.1),
+                              width: 0.5,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.arrow_upward_rounded,
+                                color: Colors.white,
+                                size: 20,
+                              ),
+                              const SizedBox(width: 6),
+                              const Text(
+                                'Arriba',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
           ], // Cierre Stack children
         ), // Cierre Stack
       ), // Cierre NotificationListener
@@ -633,6 +718,37 @@ class _GrupoDetailPageState extends State<GrupoDetailPage>
   Widget _buildMiAsistenciaContent() {
     return Column(
       children: [
+        // Mensaje de advertencia si no es día de clase
+        if (_esFechaHoy() && !_esDiaDeClase()) ...[
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.orange.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: Colors.orange.withOpacity(0.3),
+                width: 1,
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.info_outline, color: Colors.orange, size: 24),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Hoy no hay clase de este grupo según el horario',
+                    style: TextStyle(
+                      color: Colors.orange.shade300,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
         // Botón de Entrada
         Container(
           decoration: BoxDecoration(
@@ -649,7 +765,7 @@ class _GrupoDetailPageState extends State<GrupoDetailPage>
           child: Material(
             color: Colors.transparent,
             child: InkWell(
-              onTap: _entradaProfesor == null && _esFechaHoy()
+              onTap: _entradaProfesor == null && _puedeMarcarAsistenciaHoy()
                   ? () {
                       HapticFeedback.mediumImpact();
                       if (_puedeMarcarEntrada()) {
@@ -666,7 +782,9 @@ class _GrupoDetailPageState extends State<GrupoDetailPage>
               splashColor: widget.gradientColors[0].withOpacity(0.2),
               highlightColor: widget.gradientColors[0].withOpacity(0.1),
               child: Opacity(
-                opacity: _entradaProfesor == null && _esFechaHoy() ? 1.0 : 0.6,
+                opacity: _entradaProfesor == null && _puedeMarcarAsistenciaHoy()
+                    ? 1.0
+                    : 0.6,
                 child: Padding(
                   padding: const EdgeInsets.all(20.0),
                   child: Row(
@@ -736,7 +854,7 @@ class _GrupoDetailPageState extends State<GrupoDetailPage>
               onTap:
                   _entradaProfesor != null &&
                       _salidaProfesor == null &&
-                      _esFechaHoy()
+                      _puedeMarcarAsistenciaHoy()
                   ? () {
                       HapticFeedback.mediumImpact();
                       if (_puedeMarcarSalida()) {
@@ -744,7 +862,6 @@ class _GrupoDetailPageState extends State<GrupoDetailPage>
                           _salidaProfesor = DateTime.now();
                         });
                         _guardarAsistencia();
-                        _intentarSincronizarAsistencia();
                       } else {
                         _mostrarMensajeHorario(_getMensajeVentanaSalida());
                       }
@@ -757,7 +874,7 @@ class _GrupoDetailPageState extends State<GrupoDetailPage>
                 opacity:
                     _entradaProfesor != null &&
                         _salidaProfesor == null &&
-                        _esFechaHoy()
+                        _puedeMarcarAsistenciaHoy()
                     ? 1.0
                     : 0.6,
                 child: Padding(
@@ -811,6 +928,87 @@ class _GrupoDetailPageState extends State<GrupoDetailPage>
             ),
           ),
         ),
+        const SizedBox(height: 12),
+        // Botón de Subir Asistencia
+        Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFF1C1C1E),
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.2),
+                blurRadius: 10,
+                offset: const Offset(0, 5),
+              ),
+            ],
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: _entradaProfesor != null && _salidaProfesor != null
+                  ? () {
+                      HapticFeedback.mediumImpact();
+                      _intentarSincronizarAsistencia();
+                    }
+                  : null,
+              borderRadius: BorderRadius.circular(12),
+              splashColor: widget.gradientColors[0].withOpacity(0.2),
+              highlightColor: widget.gradientColors[0].withOpacity(0.1),
+              child: Opacity(
+                opacity: _entradaProfesor != null && _salidaProfesor != null
+                    ? 1.0
+                    : 0.6,
+                child: Padding(
+                  padding: const EdgeInsets.all(20.0),
+                  child: Row(
+                    children: [
+                      // Icono de subir
+                      Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: widget.gradientColors[0].withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: widget.gradientColors[0].withOpacity(0.3),
+                          ),
+                        ),
+                        child: Icon(
+                          Icons.cloud_upload_rounded,
+                          color: widget.gradientColors[0],
+                          size: 24,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      // Texto
+                      Expanded(
+                        child: Text(
+                          'Subir Asistencia',
+                          style: TextStyle(
+                            color:
+                                _entradaProfesor != null &&
+                                    _salidaProfesor != null
+                                ? Colors.white.withOpacity(0.9)
+                                : Colors.white.withOpacity(0.5),
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      // Icono de flecha
+                      if (_entradaProfesor != null && _salidaProfesor != null)
+                        Icon(
+                          Icons.arrow_forward_rounded,
+                          color: widget.gradientColors[0],
+                          size: 24,
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
       ],
     );
   }
@@ -824,7 +1022,7 @@ class _GrupoDetailPageState extends State<GrupoDetailPage>
   // Cargar asistencia existente para la fecha seleccionada
   void _cargarAsistencia() {
     final registro = _asistenciaService.obtenerAsistenciaPorGrupoYFecha(
-      widget.grupo.group,
+      widget.grupo.identificadorUnico,
       _selectedDateTime,
     );
 
@@ -857,11 +1055,11 @@ class _GrupoDetailPageState extends State<GrupoDetailPage>
   // Guardar asistencia localmente
   Future<void> _guardarAsistencia() async {
     final registroId =
-        '${widget.grupo.group}_${_selectedDateTime.year}-${_selectedDateTime.month}-${_selectedDateTime.day}';
+        '${widget.grupo.identificadorUnico}_${_selectedDateTime.year}-${_selectedDateTime.month}-${_selectedDateTime.day}';
 
     final registro = AsistenciaRegistro(
       id: registroId,
-      grupoId: widget.grupo.group,
+      grupoId: widget.grupo.identificadorUnico,
       profesorId: 'profesor_id', // TODO: Obtener del auth provider
       fecha: _selectedDateTime,
       horaEntrada: _entradaProfesor,
@@ -874,7 +1072,6 @@ class _GrupoDetailPageState extends State<GrupoDetailPage>
     );
 
     await _asistenciaService.guardarAsistencia(registro);
-    _actualizarEstadoSincronizacion();
   }
 
   // Intentar sincronizar asistencia a la nube
@@ -1053,13 +1250,6 @@ class _GrupoDetailPageState extends State<GrupoDetailPage>
         );
       },
     );
-
-    // Auto cerrar después de 2 segundos
-    Future.delayed(const Duration(seconds: 2), () {
-      if (mounted) {
-        Navigator.of(context).pop();
-      }
-    });
   }
 
   // Mostrar diálogo de error de sincronización
@@ -1175,6 +1365,26 @@ class _GrupoDetailPageState extends State<GrupoDetailPage>
       _selectedDateTime.day,
     );
     return selected == today;
+  }
+
+  // Verificar si la fecha seleccionada es un día de clase válido
+  bool _esDiaDeClase() {
+    final weekdaysConClase = widget.grupo.weekdaysConClase;
+    if (weekdaysConClase.isEmpty)
+      return true; // Si no hay horario, permitir cualquier día
+
+    // weekday: 1=Monday, 2=Tuesday, ..., 7=Sunday
+    return weekdaysConClase.contains(_selectedDateTime.weekday);
+  }
+
+  // Verificar si se puede marcar asistencia (es hoy Y es día de clase)
+  bool _puedeMarcarAsistenciaHoy() {
+    return _esFechaHoy() && _esDiaDeClase();
+  }
+
+  // Para alumnos: permite marcar en cualquier fecha si es día de clase
+  bool _puedeMarcarAsistenciaAlumnos() {
+    return _esDiaDeClase();
   }
 
   String _getFormattedDate(DateTime dateTime) {
@@ -1472,9 +1682,45 @@ class _GrupoDetailPageState extends State<GrupoDetailPage>
   Widget _buildAlumnosContent() {
     return Column(
       children: [
+        // Mensaje de advertencia si no es día de clase
+        if (!_esDiaDeClase()) ...[
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.orange.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: Colors.orange.withOpacity(0.3),
+                width: 1,
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.info_outline,
+                  color: Colors.orange,
+                  size: 24,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Este día no hay clase de este grupo según el horario',
+                    style: TextStyle(
+                      color: Colors.orange.shade300,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
         // Botón de pasar lista con Bluetooth
-        _buildPassListBTButton(),
-        const SizedBox(height: 12),
+        // NOTA: Botón temporalmente oculto - código preservado para uso futuro
+        // _buildPassListBTButton(),
+        // const SizedBox(height: 12),
         // Lista de alumnos
         Container(
           decoration: BoxDecoration(
@@ -1501,6 +1747,8 @@ class _GrupoDetailPageState extends State<GrupoDetailPage>
             ),
           ),
         ),
+        // Espacio adicional al final para mejor visualización del último alumno
+        const SizedBox(height: 100),
       ],
     );
   }
@@ -1574,12 +1822,14 @@ class _GrupoDetailPageState extends State<GrupoDetailPage>
   }
 
   Widget _buildStudentCard(dynamic alumno, {bool isLast = false}) {
+    final puedeMarcar = _puedeMarcarAsistenciaAlumnos();
+    
     return Container(
       color: const Color(0xFF1C1C1E),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: () async {
+          onTap: puedeMarcar ? () async {
             HapticFeedback.mediumImpact();
             setState(() {
               final currentValue =
@@ -1588,17 +1838,19 @@ class _GrupoDetailPageState extends State<GrupoDetailPage>
             });
             // Guardar en almacenamiento local
             await _guardarAsistencia();
-          },
-          splashColor: widget.gradientColors[0].withOpacity(0.2),
-          highlightColor: widget.gradientColors[0].withOpacity(0.1),
+          } : null,
+          splashColor: puedeMarcar ? widget.gradientColors[0].withOpacity(0.2) : Colors.transparent,
+          highlightColor: puedeMarcar ? widget.gradientColors[0].withOpacity(0.1) : Colors.transparent,
           child: Column(
             children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 18,
-                ),
-                child: Row(
+              Opacity(
+                opacity: puedeMarcar ? 1.0 : 0.5,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 18,
+                  ),
+                  child: Row(
                   children: [
                     // Nombre del estudiante
                     Expanded(
@@ -1654,6 +1906,7 @@ class _GrupoDetailPageState extends State<GrupoDetailPage>
                   ],
                 ),
               ),
+            ),
               // Línea separadora alineada con el contenido (excepto para el último elemento)
               if (!isLast)
                 Padding(

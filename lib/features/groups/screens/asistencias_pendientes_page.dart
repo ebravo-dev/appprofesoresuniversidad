@@ -27,6 +27,29 @@ class _AsistenciasPendientesPageState extends State<AsistenciasPendientesPage> {
   bool _isLoading = true;
   bool _isSyncing = false;
 
+  // Gradientes y colores de acentos (igual que en grupos_page)
+  static const List<List<Color>> _cardGradients = [
+    [Color(0xFF8B5CF6), Color(0xFF7C3AED)],
+    [Color(0xFFFF6B9D), Color(0xFFFF5A8F)],
+    [Color(0xFF2DD4BF), Color(0xFF14B8A6)],
+    [Color(0xFFFF8A65), Color(0xFFFF7043)],
+    [Color(0xFF60A5FA), Color(0xFF3B82F6)],
+    [Color(0xFFFF6B9D), Color(0xFFFF5A8F)],
+  ];
+
+  // Obtener colores para un grupo específico
+  List<Color> _getColoresParaGrupo(String grupoId) {
+    if (widget.todosLosGrupos == null) return _cardGradients[0];
+
+    // Buscar el índice del grupo en la lista original
+    final index = widget.todosLosGrupos!.indexWhere(
+      (g) => g.identificadorUnico == grupoId,
+    );
+
+    if (index == -1) return _cardGradients[0];
+    return _cardGradients[index % _cardGradients.length];
+  }
+
   @override
   void initState() {
     super.initState();
@@ -43,9 +66,9 @@ class _AsistenciasPendientesPageState extends State<AsistenciasPendientesPage> {
 
     for (var asistencia in todasLasAsistencias) {
       if (asistencia.nombreClase == null || asistencia.nombreClase!.isEmpty) {
-        // Buscar el grupo correspondiente
+        // Buscar el grupo correspondiente usando el identificador único
         final grupo = widget.todosLosGrupos!.firstWhere(
-          (g) => g.group == asistencia.grupoId,
+          (g) => g.identificadorUnico == asistencia.grupoId,
           orElse: () => widget.todosLosGrupos!.first,
         );
 
@@ -325,17 +348,21 @@ class _AsistenciasPendientesPageState extends State<AsistenciasPendientesPage> {
                               ),
                               child: Row(
                                 children: [
-                                  const Icon(
+                                  Icon(
                                     Icons.star_rounded,
-                                    color: Colors.orange,
+                                    color: _getColoresParaGrupo(
+                                      registro.grupoId,
+                                    )[0],
                                     size: 20,
                                   ),
                                   const SizedBox(width: 6),
                                   Expanded(
                                     child: Text(
                                       'CLASE ACTUAL - ${widget.claseActual.toUpperCase()}',
-                                      style: const TextStyle(
-                                        color: Colors.orange,
+                                      style: TextStyle(
+                                        color: _getColoresParaGrupo(
+                                          registro.grupoId,
+                                        )[0],
                                         fontSize: 12,
                                         fontWeight: FontWeight.w700,
                                         letterSpacing: 1.2,
@@ -440,12 +467,23 @@ class _AsistenciasPendientesPageState extends State<AsistenciasPendientesPage> {
         .length;
     final totalAlumnos = registro.asistenciasAlumnos.length;
 
+    // Buscar el grupo correspondiente para obtener la letra del grupo
+    final grupo = widget.todosLosGrupos?.firstWhere(
+      (g) => g.identificadorUnico == registro.grupoId,
+      orElse: () => widget.todosLosGrupos!.first,
+    );
+    final letraGrupo = grupo?.group ?? registro.grupoId.split('_').last;
+
+    // Obtener los colores del grupo
+    final coloresGrupo = _getColoresParaGrupo(registro.grupoId);
+    final colorPrincipal = coloresGrupo[0];
+
     return Container(
       decoration: BoxDecoration(
         color: const Color(0xFF1C1C1E),
         borderRadius: BorderRadius.circular(16),
         border: esClaseActual
-            ? Border.all(color: Colors.orange.withOpacity(0.5), width: 1.5)
+            ? Border.all(color: colorPrincipal.withOpacity(0.5), width: 1.5)
             : null,
         boxShadow: [
           BoxShadow(
@@ -462,7 +500,7 @@ class _AsistenciasPendientesPageState extends State<AsistenciasPendientesPage> {
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: esClaseActual
-                  ? Colors.orange.withOpacity(0.15)
+                  ? colorPrincipal.withOpacity(0.15)
                   : Colors.white.withOpacity(0.05),
               borderRadius: const BorderRadius.only(
                 topLeft: Radius.circular(16),
@@ -476,13 +514,13 @@ class _AsistenciasPendientesPageState extends State<AsistenciasPendientesPage> {
                   height: 40,
                   decoration: BoxDecoration(
                     color: esClaseActual
-                        ? Colors.orange.withOpacity(0.2)
+                        ? colorPrincipal.withOpacity(0.2)
                         : Colors.white.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Icon(
                     Icons.class_,
-                    color: esClaseActual ? Colors.orange : Colors.white60,
+                    color: esClaseActual ? colorPrincipal : Colors.white60,
                     size: 20,
                   ),
                 ),
@@ -505,7 +543,7 @@ class _AsistenciasPendientesPageState extends State<AsistenciasPendientesPage> {
                       Row(
                         children: [
                           Text(
-                            'Grupo ${registro.grupoId}',
+                            'Grupo $letraGrupo',
                             style: const TextStyle(
                               color: Colors.white70,
                               fontSize: 12,
@@ -542,11 +580,11 @@ class _AsistenciasPendientesPageState extends State<AsistenciasPendientesPage> {
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
                             valueColor: AlwaysStoppedAnimation<Color>(
-                              Colors.orange,
+                              Colors.white,
                             ),
                           ),
                         )
-                      : const Icon(Icons.cloud_upload, color: Colors.orange),
+                      : Icon(Icons.cloud_upload, color: colorPrincipal),
                 ),
               ],
             ),

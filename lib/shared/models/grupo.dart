@@ -27,13 +27,37 @@ class Grupo extends Equatable {
   Map<String, dynamic> toJson() => _$GrupoToJson(this);
 
   @override
-  List<Object?> get props => [group, classroom, subject, period, students, schedule];
+  List<Object?> get props => [
+    group,
+    classroom,
+    subject,
+    period,
+    students,
+    schedule,
+  ];
 
   String get nombre => 'Grupo $group';
   String get materia => subject;
   int get totalAlumnos => students.length;
   String get infoCompleta => '$subject - Grupo $group (Periodo $period)';
   String get aula => classroom;
+
+  /// Genera un identificador único para este grupo basado en salón + materia + grupo
+  /// Esto asegura que grupos con la misma letra pero diferente salón/materia
+  /// tengan IDs distintos para sus asistencias
+  String get identificadorUnico {
+    // Normalizar el subject para eliminar caracteres especiales
+    final subjectNormalizado = subject
+        .replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_')
+        .replaceAll(RegExp(r'_+'), '_')
+        .toLowerCase();
+    final classroomNormalizado = classroom
+        .replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_')
+        .replaceAll(RegExp(r'_+'), '_')
+        .toLowerCase();
+
+    return '${classroomNormalizado}_${subjectNormalizado}_$group';
+  }
 
   /// Obtiene el horario (ej: "13:00-14:00") desde el schedule
   /// Usa el primer día que tenga horario disponible
@@ -42,10 +66,18 @@ class Grupo extends Equatable {
       print('⚠️ Schedule es NULL para grupo $group');
       return null;
     }
-    
+
     print('📅 Schedule para grupo $group: $schedule');
-    
-    final dias = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+
+    final dias = [
+      'monday',
+      'tuesday',
+      'wednesday',
+      'thursday',
+      'friday',
+      'saturday',
+      'sunday',
+    ];
     for (final dia in dias) {
       final horarioDia = schedule![dia];
       print('  - $dia: $horarioDia');
@@ -73,8 +105,16 @@ class Grupo extends Equatable {
     };
 
     final diasConHorario = <String>[];
-    final orden = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
-    
+    final orden = [
+      'monday',
+      'tuesday',
+      'wednesday',
+      'thursday',
+      'friday',
+      'saturday',
+      'sunday',
+    ];
+
     for (final dia in orden) {
       if (schedule![dia] != null && schedule![dia]!.isNotEmpty) {
         diasConHorario.add(diasAbrev[dia]!);
@@ -85,7 +125,10 @@ class Grupo extends Equatable {
     if (diasConHorario.length == 1) return diasConHorario.first;
 
     // Si son días consecutivos, usar formato "L-V"
-    if (_sonConsecutivos(diasConHorario, orden.map((d) => diasAbrev[d]!).toList())) {
+    if (_sonConsecutivos(
+      diasConHorario,
+      orden.map((d) => diasAbrev[d]!).toList(),
+    )) {
       return '${diasConHorario.first}-${diasConHorario.last}';
     }
 
